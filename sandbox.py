@@ -42,6 +42,7 @@ class Portfolio:
             self.content[ticker].change_quantity(-quantity)
 
 msci_world_etf = Asset("EUNL.DE", 10)
+print(msci_world_etf.price_history)
 
 msci_world_etf.price_history['Close'].plot(x='time', y="price")
 plt.show()
