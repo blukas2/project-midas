@@ -1,6 +1,10 @@
 import tkinter as tk
 from tkinter import ttk
 
+import matplotlib as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 
 class AppWindow:
     def __init__(self):
@@ -33,18 +37,24 @@ class DropdownMenu:
 
 class MainWindowComponents:
     def __init__(self, window):
-        self.btn_add_asset = tk.Button(window, text="Add Asset", command=self.add_asset)
-        self.btn_remove_asset = tk.Button(window, text="Remove Asset", command=self.remove_asset)
-        self.btn_recalculate_portfolio = tk.Button(window, text="Recalculate Portfolio", command=self.recalculate_portfolio)
-
+        self._define_buttons(window)
         self._define_asset_table(window)
+        self._define_main_plot(window)
+        self._define_returns_plot(window)
+        self._place_components()
 
+    def _place_components(self):
         self.btn_add_asset.grid(row = 1, column = 1, columnspan = 1)
         self.btn_remove_asset.grid(row = 1, column = 2, columnspan = 1)
         self.btn_recalculate_portfolio.grid(row = 1, column = 3, columnspan = 1)
         self.asset_table.grid(row = 2, column = 1, columnspan = 5)
+        self.main_plot_canvas.get_tk_widget().grid(row = 2, column = 6, columnspan = 4)
+        self.returns_plot_canvas.get_tk_widget().grid(row = 3, column = 6, columnspan = 4)
 
-
+    def _define_buttons(self, window):
+        self.btn_add_asset = tk.Button(window, text="Add Asset", command=self.add_asset)
+        self.btn_remove_asset = tk.Button(window, text="Remove Asset", command=self.remove_asset)
+        self.btn_recalculate_portfolio = tk.Button(window, text="Recalculate Portfolio", command=self.recalculate_portfolio)
 
     def _define_asset_table(self, window):
         self.asset_table = ttk.Treeview(window)
@@ -63,6 +73,44 @@ class MainWindowComponents:
         self.asset_table.heading("quantity",text='Quantity')
         self.asset_table.heading("current_price",text='Current Price')
         self.asset_table.heading("value",text='Value')
+
+    def _define_main_plot(self, window):
+        data = {
+            'Python': 11.27,
+            'C': 11.16,
+            'Java': 10.46,
+            'C++': 7.5,
+            'C#': 5.26
+        }
+        languages = data.keys()
+        popularity = data.values()
+
+        figure = Figure(figsize=(6, 4), dpi=100)
+        self.main_plot_canvas = FigureCanvasTkAgg(figure, window)
+        axes = figure.add_subplot()
+        axes.line(languages, popularity)
+        #axes.bar(languages, popularity)
+        axes.set_title('Top 5 Programming Languages')
+        axes.set_ylabel('Popularity')
+
+    def _define_returns_plot(self, window):
+        data = {
+            '1m': -12.23,
+            '6m': -3.13,
+            '1y': 2.23,
+            '5y': 7.5,
+            '10y': 5.26,
+            'YTD': -6.22
+        }
+        periods = data.keys()
+        returns = data.values()
+
+        figure = Figure(figsize=(6, 3), dpi=100)
+        self.returns_plot_canvas = FigureCanvasTkAgg(figure, window)
+        axes = figure.add_subplot()
+        axes.bar(periods, returns)
+        axes.set_title('Portfolio Returns')
+        axes.set_ylabel('annualized %')
 
     def add_asset(self):
         pass

@@ -1,8 +1,9 @@
+import pandas as pd
 from yfinance import Ticker
 
 
 class Asset(Ticker):
-    def __init__(self, ticker: str, quantity: float, session=None):
+    def __init__(self, ticker: str, quantity: int, session=None):
         super().__init__(ticker, session)
         self.quantity = quantity
         self.price_history = self._get_price_history()
@@ -10,7 +11,12 @@ class Asset(Ticker):
     def _get_price_history(self):
         df = self.history(period="15y")
         df = df[df['Volume']!=0]
-        df['Value'] = df['Close']*self.quantity
+        df['Currency'] = self.info['currency']
+        df['Quantity'] = self.quantity
+        df = df.rename(columns={'Close': 'Price'})
+        df['Value'] = df['Price']*self.quantity
+        df.reset_index(inplace=True)
+        df['Date'] = pd.to_datetime(df['Date']).dt.date
         return df
 
     def change_quantity(self, quantity_change):
@@ -40,3 +46,9 @@ class Portfolio:
             self.content.pop(ticker)
         else:
             self.content[ticker].change_quantity(-quantity)
+
+    def calculate(self):
+        for asset in self.content.values():
+            self.history = asset.price_history[['Date', 'Price', 'Value']]
+            break
+    
