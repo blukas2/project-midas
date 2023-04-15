@@ -3,12 +3,14 @@ import matplotlib.pyplot as plt
 
 from app.components.components import *
 
-portfolio = Portfolio()
+int(None)
 
-portfolio.add_asset("EUNL.DE", 10)
-portfolio.calculate()
-
-print(portfolio.history)
+#portfolio = Portfolio()
+#
+#portfolio.add_asset("EUNL.DE", 10)
+#portfolio.calculate()
+#
+#print(portfolio.history)
 
 #msci_world_etf = Asset("EUNL.DE", 10)
 #print(msci_world_etf.price_history)
