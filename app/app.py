@@ -3,6 +3,7 @@ from tkinter import ttk
 from tkinter import messagebox as msgbox
 
 import matplotlib as plt
+from matplotlib import pyplot
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -47,7 +48,7 @@ class MainWindowComponents:
         self.window = window
         self._define_buttons()
         self._define_asset_table()
-        self._define_main_plot()
+        self.plot_history()
         self._define_returns_plot()
         self._place_components()
 
@@ -56,7 +57,7 @@ class MainWindowComponents:
         self.btn_remove_asset.grid(row = 1, column = 2, columnspan = 1)
         self.btn_recalculate_portfolio.grid(row = 1, column = 3, columnspan = 1)
         self.asset_table.grid(row = 2, column = 1, columnspan = 5)
-        self.main_plot_canvas.get_tk_widget().grid(row = 2, column = 6, columnspan = 4)
+        #self.main_plot_canvas.get_tk_widget().grid(row = 2, column = 6, columnspan = 4)
         self.returns_plot_canvas.get_tk_widget().grid(row = 3, column = 6, columnspan = 4)
 
     def _define_buttons(self):
@@ -82,7 +83,20 @@ class MainWindowComponents:
         self.asset_table.heading("current_price",text='Current Price')
         self.asset_table.heading("value",text='Value')
 
-    def _define_main_plot(self):
+    def plot_history(self):
+        figure = pyplot.Figure(figsize=(6,4), dpi=100)
+        ax = figure.add_subplot(111)
+        self.main_plot_canvas = FigureCanvasTkAgg(figure, self.window)        
+        ax.set_title('Value History')
+        try:
+            df = PORTFOLIO.history[['Date', 'Value']]
+        except AttributeError:
+            pass
+        else:
+            df.plot(x='Date', y='Value', kind='line', legend=True, ax=ax)
+        self.main_plot_canvas.get_tk_widget().grid(row = 2, column = 6, columnspan = 4)
+
+    def _define_main_plot_old(self):
         data = {
             'Python': 11.27,
             'C': 11.16,
@@ -128,6 +142,7 @@ class MainWindowComponents:
 
     def recalculate_portfolio(self):
         self.refresh_table()
+        self.plot_history()
 
     def refresh_table(self):
         self.asset_table.delete(*self.asset_table.get_children())
@@ -179,6 +194,7 @@ class AddAssetWindow:
             except AttributeError:
                 msgbox.showerror(title="ERROR!", message=f'{ticker}: No data found, symbol may be delisted.')
             else:
+                PORTFOLIO.calculate()
                 self.subject.refresh_table()
                 self.window.destroy()
 
