@@ -40,16 +40,14 @@ class DropdownMenu:
         self.root.destroy()
 
 
-
-
-
 class MainWindowComponents:
     def __init__(self, window):
         self.window = window
         self._define_buttons()
         self._define_asset_table()
         self.plot_history()
-        self._define_returns_plot()
+        self.plot_returns()
+        self.plot_annualized_returns()
         self._place_components()
 
     def _place_components(self):
@@ -57,8 +55,6 @@ class MainWindowComponents:
         self.btn_remove_asset.grid(row = 1, column = 2, columnspan = 1)
         self.btn_recalculate_portfolio.grid(row = 1, column = 3, columnspan = 1)
         self.asset_table.grid(row = 2, column = 1, columnspan = 5)
-        #self.main_plot_canvas.get_tk_widget().grid(row = 2, column = 6, columnspan = 4)
-        self.returns_plot_canvas.get_tk_widget().grid(row = 3, column = 6, columnspan = 4)
 
     def _define_buttons(self):
         self.btn_add_asset = tk.Button(self.window, text="Add Asset", command=self.add_asset)
@@ -96,43 +92,37 @@ class MainWindowComponents:
             df.plot(x='Date', y='Value', kind='line', legend=True, ax=ax)
         self.main_plot_canvas.get_tk_widget().grid(row = 2, column = 6, columnspan = 4)
 
-    def _define_main_plot_old(self):
-        data = {
-            'Python': 11.27,
-            'C': 11.16,
-            'Java': 10.46,
-            'C++': 7.5,
-            'C#': 5.26
-        }
-        languages = data.keys()
-        popularity = data.values()
-
-        figure = Figure(figsize=(6, 4), dpi=100)
-        self.main_plot_canvas = FigureCanvasTkAgg(figure, self.window)
-        axes = figure.add_subplot()
-        #axes.line(languages, popularity)
-        axes.bar(languages, popularity)
-        axes.set_title('Top 5 Programming Languages')
-        axes.set_ylabel('Popularity')
-
-    def _define_returns_plot(self):
-        data = {
-            '1m': -12.23,
-            '6m': -3.13,
-            '1y': 2.23,
-            '5y': 7.5,
-            '10y': 5.26,
-            'YTD': -6.22
-        }
-        periods = data.keys()
-        returns = data.values()
-
+    def plot_returns(self):
         figure = Figure(figsize=(6, 3), dpi=100)
         self.returns_plot_canvas = FigureCanvasTkAgg(figure, self.window)
         axes = figure.add_subplot()
-        axes.bar(periods, returns)
-        axes.set_title('Portfolio Returns')
-        axes.set_ylabel('annualized %')
+        try:
+            periods = PORTFOLIO.returns.keys()
+            returns = PORTFOLIO.returns.values()
+        except AttributeError:
+            pass
+        else:
+            bar = axes.bar(periods, returns)
+            axes.set_title('Portfolio Returns')
+            axes.set_ylabel('%')
+            axes.bar_label(bar)
+        self.returns_plot_canvas.get_tk_widget().grid(row = 3, column = 6, columnspan = 4)
+
+    def plot_annualized_returns(self):
+        figure = Figure(figsize=(6, 3), dpi=100)
+        self.annualized_returns_plot_canvas = FigureCanvasTkAgg(figure, self.window)
+        axes = figure.add_subplot()
+        try:
+            periods = PORTFOLIO.annualized_returns.keys()
+            returns = PORTFOLIO.annualized_returns.values()
+        except AttributeError:
+            pass
+        else:
+            bar = axes.bar(periods, returns)
+            axes.set_title('Portfolio Annualized Returns')
+            axes.set_ylabel('%')
+            axes.bar_label(bar)
+        self.annualized_returns_plot_canvas.get_tk_widget().grid(row = 3, column = 11, columnspan = 4)
 
     def add_asset(self):
         self.add_asset_window = AddAssetWindow(self.window, self)
@@ -143,6 +133,8 @@ class MainWindowComponents:
     def recalculate_portfolio(self):
         self.refresh_table()
         self.plot_history()
+        self.plot_returns()
+        self.plot_annualized_returns()
 
     def refresh_table(self):
         self.asset_table.delete(*self.asset_table.get_children())
