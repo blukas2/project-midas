@@ -1,8 +1,11 @@
 import pandas as pd
+import json
 from yfinance import Ticker
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from typing import Optional
+
+from app.globals.settings import FOLDER
 
 class Asset(Ticker):
     def __init__(self, ticker: str, quantity: int, session=None):
@@ -129,11 +132,32 @@ class Portfolio:
     
     def _get_value_at_date(self, date) -> float:
         return self.history[self.history['Date']==date]['Value'].values[0]
-
     
-
+    def retrieve_component_data(self):
+        component_data = {}
+        for ticker, asset in self.content.items():
+            component_data[ticker] = asset.quantity
+        return component_data
     
+    def load_portfolio(self, component_data: dict[str, int]):
+        for ticker, quantity in component_data():
+            self.add_asset(ticker, quantity)
 
 
-
+class FileManager:
+    def __init__(self):
+        self.folder = FOLDER
+        self.filepath = f"{FOLDER}/portfolio.json"
     
+    def save_portfolio(self, portfolio: Portfolio):        
+        component_data = portfolio.retrieve_component_data()
+        with open(self.filepath, mode="w+") as file:
+            file.write(json.dumps(component_data))
+
+    def load_portfolio(self):
+        with open(self.filepath) as file:
+            component_data = json.load(file)
+        portfolio = Portfolio()
+        for ticker, quantity in component_data:
+            portfolio.add_asset(ticker, quantity)
+        return portfolio

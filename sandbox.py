@@ -7,9 +7,15 @@ from app.components.components import *
 
 portfolio = Portfolio()
 #
-portfolio.add_asset("EUNL.DE", 10)
-portfolio.calculate()
-print(portfolio.annualized_returns)
+
+from app.globals.settings import FOLDER
+
+import os
+
+print(os.listdir(FOLDER))
+#portfolio.add_asset("EUNL.DE", 10)
+#portfolio.calculate()
+#print(portfolio.annualized_returns)
 #print(portfolio.history)
 #asset = Asset("EUNL.DE", 10)
 #print(asset.info)
