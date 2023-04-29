@@ -7,6 +7,12 @@ from typing import Optional
 
 from app.globals.settings import FOLDER
 
+class BackEnd:
+    def __init__(self):
+        self.portfolio = Portfolio()
+        self.file_manager = FileManager(self.portfolio)
+
+
 class Asset(Ticker):
     def __init__(self, ticker: str, quantity: int, session=None):
         super().__init__(ticker, session)
@@ -145,12 +151,13 @@ class Portfolio:
 
 
 class FileManager:
-    def __init__(self):
+    def __init__(self, portfolio: Portfolio):
+        self.portfolio = portfolio
         self.folder = FOLDER
         self.filepath = f"{FOLDER}/portfolio.json"
     
-    def save_portfolio(self, portfolio: Portfolio):        
-        component_data = portfolio.retrieve_component_data()
+    def save_portfolio(self):        
+        component_data = self.portfolio.retrieve_component_data()
         with open(self.filepath, mode="w+") as file:
             file.write(json.dumps(component_data))
 
