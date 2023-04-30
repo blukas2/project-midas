@@ -5,13 +5,21 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from typing import Optional
 
-from app.globals.settings import FOLDER
+from globals.settings import FOLDER
 
 class BackEnd:
     def __init__(self):
         self.portfolio = Portfolio()
         self.file_manager = FileManager(self.portfolio)
 
+    def load_portfolio(self):
+        self.portfolio = self.file_manager.load_portfolio()
+        self.file_manager = FileManager(self.portfolio)
+
+
+class FxRate(Ticker):
+    def __init__(self, ticker: str, quantity: int, session=None):
+        super().__init__(ticker, session)
 
 class Asset(Ticker):
     def __init__(self, ticker: str, quantity: int, session=None):
@@ -35,6 +43,8 @@ class Asset(Ticker):
             raise ValueError("The quantity of an asset cannot be decreased by more than its current quantity")
         self.quantity = self.quantity + quantity_change
 
+    #def convert
+
 
 class Portfolio:
     def __init__(self):
@@ -50,10 +60,10 @@ class Portfolio:
 
     def reduce_position(self, ticker: str, quantity: int):
         if ticker not in self.content:
-            raise ValueError(f"Product '{ticker}' not found in portfolio")
-        if quantity>self.content[ticker].quantity:
-            raise ValueError(f"Unable to reduce position for '{ticker}', has fewer quantity.")
-        if quantity==self.content[ticker].quantity:
+            return f"Product '{ticker}' not found in portfolio"
+        elif quantity>self.content[ticker].quantity:
+            return f"Unable to reduce position for '{ticker}', has fewer quantity."
+        elif quantity==self.content[ticker].quantity:
             self.content.pop(ticker)
         else:
             self.content[ticker].change_quantity(-quantity)
@@ -64,6 +74,11 @@ class Portfolio:
         self._calculate_annualized_returns()
 
     def _calculate_history(self):
+        for asset in self.content.values():
+            self.history = asset.price_history[['Date', 'Price', 'Value']]
+            break
+    
+    def _calculate_history_old(self):
         for asset in self.content.values():
             self.history = asset.price_history[['Date', 'Price', 'Value']]
             break
@@ -144,10 +159,6 @@ class Portfolio:
         for ticker, asset in self.content.items():
             component_data[ticker] = asset.quantity
         return component_data
-    
-    def load_portfolio(self, component_data: dict[str, int]):
-        for ticker, quantity in component_data():
-            self.add_asset(ticker, quantity)
 
 
 class FileManager:
@@ -165,6 +176,7 @@ class FileManager:
         with open(self.filepath) as file:
             component_data = json.load(file)
         portfolio = Portfolio()
-        for ticker, quantity in component_data:
+        for ticker, quantity in component_data.items():
             portfolio.add_asset(ticker, quantity)
+        portfolio.calculate()
         return portfolio

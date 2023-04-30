@@ -43,15 +43,17 @@ class MainWindowComponents:
         self._place_components()
 
     def _place_components(self):
-        self.btn_add_asset.grid(row = 1, column = 1, columnspan = 1)
-        self.btn_remove_asset.grid(row = 1, column = 2, columnspan = 1)
+        self.btn_change_position.grid(row = 1, column = 1, columnspan = 1)
         self.btn_recalculate_portfolio.grid(row = 1, column = 3, columnspan = 1)
+        self.btn_load_portfolio.grid(row = 1, column = 6, columnspan = 1)
+        self.btn_save_portfolio.grid(row = 1, column = 7, columnspan = 1)
         self.asset_table.grid(row = 2, column = 1, columnspan = 5)
 
     def _define_buttons(self):
-        self.btn_add_asset = tk.Button(self.window, text="Add Asset", command=self.add_asset)
-        self.btn_remove_asset = tk.Button(self.window, text="Remove Asset", command=self.remove_asset)
+        self.btn_change_position = tk.Button(self.window, text="Change Position", command=self.change_position)
         self.btn_recalculate_portfolio = tk.Button(self.window, text="Recalculate Portfolio", command=self.recalculate_portfolio)
+        self.btn_load_portfolio = tk.Button(self.window, text="Load Portfolio", command=self.load_portfolio)
+        self.btn_save_portfolio = tk.Button(self.window, text="Save Portfolio", command=self.save_portfolio)
 
     def _define_asset_table(self):
         self.asset_table = ttk.Treeview(self.window)
@@ -89,8 +91,8 @@ class MainWindowComponents:
         self.returns_plot_canvas = FigureCanvasTkAgg(figure, self.window)
         axes = figure.add_subplot()
         try:
-            periods = self.portfolio.returns.keys()
-            returns = self.portfolio.returns.values()
+            periods = self.backend.portfolio.returns.keys()
+            returns = self.backend.portfolio.returns.values()
         except AttributeError:
             pass
         else:
@@ -116,13 +118,11 @@ class MainWindowComponents:
             axes.bar_label(bar)
         self.annualized_returns_plot_canvas.get_tk_widget().grid(row = 3, column = 11, columnspan = 4)
 
-    def add_asset(self):
-        self.add_asset_window = AddAssetWindow(self.window, self, self.backend)
-
-    def remove_asset(self):
-        pass
+    def change_position(self):
+        self.change_position_window = ChangePositionWindow(self.window, self, self.backend)
 
     def recalculate_portfolio(self):
+        self.backend.portfolio.calculate()
         self.refresh_table()
         self.plot_history()
         self.plot_returns()
@@ -130,7 +130,7 @@ class MainWindowComponents:
 
     def refresh_table(self):
         self.asset_table.delete(*self.asset_table.get_children())
-        for asset in self.portfolio.content.values():
+        for asset in self.backend.portfolio.content.values():
             iid = len(self.asset_table.get_children())
             self.asset_table.insert(parent='',index='end',iid=iid,text='',
                                     values=(asset.ticker,
@@ -138,13 +138,20 @@ class MainWindowComponents:
                                             asset.quantity,
                                             asset.info['regularMarketPreviousClose'],
                                             asset.info['regularMarketPreviousClose']*asset.quantity))
+    
+    def load_portfolio(self):
+        self.backend.load_portfolio()
+        self.recalculate_portfolio()
 
-class AddAssetWindow:
+    def save_portfolio(self):
+        self.backend.file_manager.save_portfolio()
+
+class ChangePositionWindow:
     def __init__(self, master, subject: MainWindowComponents, backend: BackEnd):
         self.backend = backend
         self.subject = subject
         self.window = tk.Toplevel(master)
-        self.window.title("Add Asset to Portfolio")
+        self.window.title("Change Position")
         self._define_components()
         self._place_components()
 
@@ -156,6 +163,7 @@ class AddAssetWindow:
         self.entry_quantity = tk.Entry(self.window, width = 10, borderwidth = 5)
         
         self.btn_add = tk.Button(self.window,text ="Add", command = self.add_asset)
+        self.btn_remove = tk.Button(self.window,text ="Reduce", command=self.reduce_position)
         self.btn_cancel = tk.Button(self.window,text ="Cancel", command = self.close)
 
     def _place_components(self):
@@ -165,7 +173,8 @@ class AddAssetWindow:
         self.entry_quantity.grid(row = 1, column = 4, columnspan = 1)
 
         self.btn_add.grid(row = 2, column = 2, columnspan = 1)
-        self.btn_cancel.grid(row = 2, column = 3, columnspan = 1)
+        self.btn_remove.grid(row = 2, column = 3, columnspan = 1)
+        self.btn_cancel.grid(row = 2, column = 4, columnspan = 1)
 
     def add_asset(self):
         try:
@@ -178,6 +187,21 @@ class AddAssetWindow:
                 self.backend.portfolio.add_asset(ticker, quantity)
             except AttributeError:
                 msgbox.showerror(title="ERROR!", message=f'{ticker}: No data found, symbol may be delisted.')
+            else:
+                self.backend.portfolio.calculate()
+                self.subject.refresh_table()
+                self.window.destroy()
+
+    def reduce_position(self):
+        try:
+            ticker = str(self.entry_ticker.get())
+            quantity = int(self.entry_quantity.get())
+        except (ValueError, AttributeError):
+            msgbox.showerror(title="ERROR!", message='Invalid ticker or quantity.')
+        else:
+            response_message = self.backend.portfolio.reduce_position(ticker, quantity)
+            if response_message is not None:
+                msgbox.showerror(title="ERROR!", message=response_message)
             else:
                 self.backend.portfolio.calculate()
                 self.subject.refresh_table()

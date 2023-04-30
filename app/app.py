@@ -1,6 +1,6 @@
 import tkinter as tk
 
-from ui.ui import *
+from ui.ui import DropdownMenu, MainWindowComponents
 from components.components import BackEnd
 
 def main():

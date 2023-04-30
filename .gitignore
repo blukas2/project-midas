@@ -1,1 +1,3 @@
-.sandbox.py
+sandbox.py
+__pycache__
+*cpython*
