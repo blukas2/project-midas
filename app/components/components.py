@@ -5,7 +5,7 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from typing import Optional
 
-from globals.settings import FOLDER
+from globals.settings import FOLDER, CURRENCY
 
 class BackEnd:
     def __init__(self):
@@ -17,9 +17,20 @@ class BackEnd:
         self.file_manager = FileManager(self.portfolio)
 
 
-class FxRate(Ticker):
-    def __init__(self, ticker: str, quantity: int, session=None):
-        super().__init__(ticker, session)
+class CrossFx(Ticker):
+    def __init__(self, target_fx, source_fx):
+        ticker = f"{target_fx}{source_fx}=X"
+        super().__init__(ticker)
+        self.price_history = self._get_price_history()
+
+    def _get_price_history(self):
+        df = self.history(period="15y")
+        df = df.rename(columns={'Close': 'FX Rate'})
+        df.reset_index(inplace=True)
+        df['Date'] = pd.to_datetime(df['Date']).dt.date
+        return df
+
+
 
 class Asset(Ticker):
     def __init__(self, ticker: str, quantity: int, session=None):
@@ -37,18 +48,24 @@ class Asset(Ticker):
         df.reset_index(inplace=True)
         df['Date'] = pd.to_datetime(df['Date']).dt.date
         return df
+    
+    def convert_fx(self, cross_fx: CrossFx):
+        self.price_history = self.price_history.join(cross_fx.price_history[['Date', 'FX Rate']].set_index('Date'), on=['Date'], how='left', rsuffix='_fx')
+        self.price_history['Price Original Fx'] = self.price_history['Price']
+        self.price_history['Value Original Fx'] = self.price_history['Value']
+        self.price_history['Price'] = self.price_history['Price']/self.price_history['FX Rate']
+        self.price_history['Value'] = self.price_history['Value']/self.price_history['FX Rate']
 
     def change_quantity(self, quantity_change):
         if self.quantity + quantity_change < 0:
             raise ValueError("The quantity of an asset cannot be decreased by more than its current quantity")
         self.quantity = self.quantity + quantity_change
 
-    #def convert
-
 
 class Portfolio:
     def __init__(self):
         self.content: dict[str,Asset] = {}
+        self.fx_rates: dict[str, CrossFx] = {}
 
     def add_asset(self, ticker: str, quantity: int):
         if quantity<0:
@@ -75,6 +92,9 @@ class Portfolio:
 
     def _calculate_history(self):
         for asset in self.content.values():
+            if asset.info['currency']!= CURRENCY:
+                fx_ticker = asset.info['currency'] + CURRENCY
+                asset.convert_fx()
             self.history = asset.price_history[['Date', 'Price', 'Value']]
             break
     
