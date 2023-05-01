@@ -37,6 +37,7 @@ class Asset(Ticker):
         super().__init__(ticker, session)
         self.quantity = quantity
         self.price_history = self._get_price_history()
+        self.converted = False
 
     def _get_price_history(self):
         df = self.history(period="15y")
@@ -55,6 +56,7 @@ class Asset(Ticker):
         self.price_history['Value Original Fx'] = self.price_history['Value']
         self.price_history['Price'] = self.price_history['Price']/self.price_history['FX Rate']
         self.price_history['Value'] = self.price_history['Value']/self.price_history['FX Rate']
+        self.converted = True
 
     def change_quantity(self, quantity_change):
         if self.quantity + quantity_change < 0:
@@ -86,23 +88,31 @@ class Portfolio:
             self.content[ticker].change_quantity(-quantity)
 
     def calculate(self):
+        self._convert_asset_fx()
         self._calculate_history()
         self._calculate_returns()
         self._calculate_annualized_returns()
+        self._calculate_correlation_matrix()
+
+    def _convert_asset_fx(self):
+        for asset in self.content.values():
+            if (asset.info['currency']!= CURRENCY) and (asset.converted is False):
+                fx_ticker = asset.info['currency'] + CURRENCY
+                if fx_ticker not in self.fx_rates:
+                    self.fx_rates[fx_ticker] = CrossFx(target_fx=CURRENCY, source_fx=asset.info['currency'])
+                asset.convert_fx(self.fx_rates[fx_ticker])
 
     def _calculate_history(self):
+        counter = 0
         for asset in self.content.values():
-            if asset.info['currency']!= CURRENCY:
-                fx_ticker = asset.info['currency'] + CURRENCY
-                asset.convert_fx()
-            self.history = asset.price_history[['Date', 'Price', 'Value']]
-            break
+            counter += 1
+            if counter == 1:
+                self.history = asset.price_history[['Date', 'Value']]
+            else:
+                self.history = self.history.join(asset.price_history[['Date', 'Value']].set_index('Date'), on=['Date'], how='inner', rsuffix='_new')
+                self.history['Value'] = self.history['Value'] + self.history['Value_new']
+                self.history = self.history.drop(columns=['Value_new'])
     
-    def _calculate_history_old(self):
-        for asset in self.content.values():
-            self.history = asset.price_history[['Date', 'Price', 'Value']]
-            break
-
     def _calculate_returns(self):
         latest_date = self.history['Date'].max()
         reference_dates = self._get_all_reference_dates(latest_date)
@@ -179,7 +189,19 @@ class Portfolio:
         for ticker, asset in self.content.items():
             component_data[ticker] = asset.quantity
         return component_data
-
+    
+    def _calculate_correlation_matrix(self):
+        counter = 1
+        for ticker, asset in self.content.items():
+            df_temp = asset.price_history[['Date', 'Price']]
+            df_temp[ticker] = df_temp['Price']
+            df_temp = df_temp.drop(columns=['Price'])
+            if counter == 1:
+                df = df_temp
+            else:
+                df = df.join(df_temp.set_index('Date'), on=['Date'], how='inner')
+            counter += 1
+        self.correlation_matrix = df.drop(columns=['Date']).corr()
 
 class FileManager:
     def __init__(self, portfolio: Portfolio):

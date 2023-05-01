@@ -4,10 +4,12 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox as msgbox
 
-import matplotlib as plt
 from matplotlib import pyplot
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+import pandas as pd
+from pandastable import Table, config
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -40,6 +42,7 @@ class MainWindowComponents:
         self.plot_history()
         self.plot_returns()
         self.plot_annualized_returns()
+        self.plot_correlation_matrix()
         self._place_components()
 
     def _place_components(self):
@@ -118,6 +121,21 @@ class MainWindowComponents:
             axes.bar_label(bar)
         self.annualized_returns_plot_canvas.get_tk_widget().grid(row = 3, column = 11, columnspan = 4)
 
+    def plot_correlation_matrix(self):
+        f = tk.Frame(self.window)
+        f.grid(row = 2, column = 11, columnspan = 4)
+        try:
+            df = self.backend.portfolio.correlation_matrix
+        except AttributeError:
+            df = pd.DataFrame()
+        self.table = pt = Table(f, dataframe=df,
+                                showtoolbar=True, showstatusbar=True)
+        pt.show()
+        #set some options
+        options = {'colheadercolor':'green','floatprecision': 5}
+        config.apply_options(options, pt)
+        pt.show()
+
     def change_position(self):
         self.change_position_window = ChangePositionWindow(self.window, self, self.backend)
 
@@ -127,6 +145,7 @@ class MainWindowComponents:
         self.plot_history()
         self.plot_returns()
         self.plot_annualized_returns()
+        self.plot_correlation_matrix()
 
     def refresh_table(self):
         self.asset_table.delete(*self.asset_table.get_children())
