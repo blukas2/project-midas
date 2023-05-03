@@ -126,7 +126,9 @@ class Portfolio:
     def _compile_returns_data(self, latest_date: date, reference_dates: dict[str, date], annualized = False) -> dict[str, float]:
         returns_data = {}
         for date_string, reference_date in reference_dates.items():
-            returns_data[date_string] = self._get_percentage_change(latest_date, reference_date, annualized=annualized)
+            percentage_change = self._get_percentage_change(latest_date, reference_date, annualized=annualized)
+            if percentage_change is not None:
+                returns_data[date_string] = percentage_change
         return returns_data
     
     def _get_percentage_change(self, latest_date: date, reference_date: date, annualized=False):

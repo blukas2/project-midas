@@ -130,9 +130,9 @@ class MainWindowComponents:
             df = pd.DataFrame()
         self.table = pt = Table(f, dataframe=df,
                                 showtoolbar=True, showstatusbar=True)
-        pt.show()
+        #pt.show()
         #set some options
-        options = {'colheadercolor':'green','floatprecision': 5}
+        options = {'colheadercolor':'green','floatprecision': 3}
         config.apply_options(options, pt)
         pt.show()
 
@@ -153,7 +153,7 @@ class MainWindowComponents:
             iid = len(self.asset_table.get_children())
             self.asset_table.insert(parent='',index='end',iid=iid,text='',
                                     values=(asset.ticker,
-                                            asset.info['shortName'],
+                                            asset.info['longName'],
                                             asset.quantity,
                                             asset.info['regularMarketPreviousClose'],
                                             asset.info['regularMarketPreviousClose']*asset.quantity))
