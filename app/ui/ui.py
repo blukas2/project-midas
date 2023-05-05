@@ -15,19 +15,36 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from components.components import BackEnd
 
+
+class AppWindow:
+    def __init__(self, backend: BackEnd):
+        self.window = tk.Tk()
+        self.window.title("Midas v0.0.1")
+        self.dropdown_menu = DropdownMenu(self.window, backend)
+        self.main_window = MainWindowComponents(self.window, backend)
+    
+    def run(self):
+        self.window.mainloop()
+
+
 class DropdownMenu:
-    def __init__(self, root: tk.Tk):
+    def __init__(self, root: tk.Tk, backend: BackEnd):
         self.root = root
         self.menu = tk.Menu(self.root)
+        self.backend = backend
         root.config(menu=self.menu)
         
         self.portfolio_menu = tk.Menu(self.menu)
         self.menu.add_cascade(label='Portfolio', menu=self.portfolio_menu)
         self.portfolio_menu.add_command(label="New")
-        self.portfolio_menu.add_command(label="Open")
+        self.portfolio_menu.add_command(label="Open", command=self._open_portfolio)
         self.portfolio_menu.add_command(label="Save")
         self.portfolio_menu.add_command(label="Save as...")
         self.portfolio_menu.add_command(label="Exit", command=self._exit_command)
+
+    def _open_portfolio(self):
+        self.backend.file_manager.list_portfolios()
+        self.open_portfolio_window = OpenPortfolioWindow(self.root, self.backend)
 
     def _exit_command(self):
         self.root.destroy()
@@ -228,3 +245,38 @@ class ChangePositionWindow:
 
     def close(self):
         self.window.destroy()
+
+
+class OpenPortfolioWindow:
+    def __init__(self, master, backend: BackEnd):#, subject: MainWindowComponents, backend: BackEnd):
+        self.backend = backend
+        #self.subject = subject
+        self.window = tk.Toplevel(master)
+        self.window.title("Opening Portfolio...")
+        self._define_components()
+        self._place_components()
+
+    def _define_components(self):
+        self.lbl_maintext = tk.Label(self.window, text="Select Portfolio")
+        ##################
+        self.dropd_content = tk.StringVar()
+        if self.backend.file_manager.portfolio_names_list:
+            self.dropd_content.set(self.backend.file_manager.portfolio_names_list[0])
+        self.dropd_selecter = tk.OptionMenu(self.window, self.dropd_content , *self.backend.file_manager.portfolio_names_list)
+        
+        self.btn_ok = tk.Button(self.window,text ="OK")
+        self.btn_cancel = tk.Button(self.window,text ="Cancel", command = self.close)
+
+    def _place_components(self):
+        self.lbl_maintext.grid(row = 1, column = 1, columnspan = 2)
+        self.dropd_selecter.grid(row = 2, column = 1, columnspan = 2)
+        self.btn_ok.grid(row = 3, column = 1, columnspan = 1)
+        self.btn_cancel.grid(row = 3, column = 2, columnspan = 1)
+
+    def close(self):
+        self.window.destroy()
+
+    def load_selected_portfolio(self):
+        portfolio_name = self.dropd_content.get()
+
+

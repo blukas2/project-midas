@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import json
 from yfinance import Ticker
@@ -224,3 +225,19 @@ class FileManager:
             portfolio.add_asset(ticker, quantity)
         portfolio.calculate()
         return portfolio
+    
+    def list_portfolios(self):
+        self._create_portfolio_name_file_mapping()
+        self._create_portfolio_name_list()
+    
+    def _create_portfolio_name_file_mapping(self):
+        self.portfolio_names_and_files = {}
+        portfolio_files = self._list_portfolio_files()
+        for file in portfolio_files:
+            self.portfolio_names_and_files[file[:-5]] = file
+
+    def _create_portfolio_name_list(self):
+        self.portfolio_names_list =  [name for name in self.portfolio_names_and_files.keys()]
+
+    def _list_portfolio_files(self):
+        return [file for file in os.listdir(self.folder) if file[-5:]=='.json']
