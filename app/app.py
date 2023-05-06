@@ -1,5 +1,3 @@
-import tkinter as tk
-
 from ui.ui import AppWindow
 from components.components import BackEnd
 

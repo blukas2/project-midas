@@ -11,11 +11,16 @@ from globals.settings import FOLDER, CURRENCY
 class BackEnd:
     def __init__(self):
         self.portfolio = Portfolio()
-        self.file_manager = FileManager(self.portfolio)
+        self.file_manager = FileManager()
 
-    def load_portfolio(self):
-        self.portfolio = self.file_manager.load_portfolio()
-        self.file_manager = FileManager(self.portfolio)
+    def load_portfolio(self, portfolio_name: str):
+        self.portfolio = self.file_manager.load_portfolio(portfolio_name)
+
+    def save_portfolio(self):
+        self.file_manager.save_portfolio(self.portfolio)
+
+    def new_portfolio(self, portfolio_name):
+        self.portfolio = Portfolio(portfolio_name)
 
 
 class CrossFx(Ticker):
@@ -66,7 +71,8 @@ class Asset(Ticker):
 
 
 class Portfolio:
-    def __init__(self):
+    def __init__(self, name: Optional[str] = None):
+        self.name = name
         self.content: dict[str,Asset] = {}
         self.fx_rates: dict[str, CrossFx] = {}
 
@@ -207,37 +213,26 @@ class Portfolio:
         self.correlation_matrix = df.drop(columns=['Date']).corr()
 
 class FileManager:
-    def __init__(self, portfolio: Portfolio):
-        self.portfolio = portfolio
+    def __init__(self):
         self.folder = FOLDER
-        self.filepath = f"{FOLDER}/portfolio.json"
     
-    def save_portfolio(self):        
-        component_data = self.portfolio.retrieve_component_data()
-        with open(self.filepath, mode="w+") as file:
+    def save_portfolio(self, portfolio: Portfolio):        
+        component_data = portfolio.retrieve_component_data()
+        file_name = portfolio.name + '.json'
+        file_path = f"{self.folder}/{file_name}"
+        with open(file_path, mode="w+") as file:
             file.write(json.dumps(component_data))
 
-    def load_portfolio(self):
-        with open(self.filepath) as file:
+    def load_portfolio(self, portfolio_name):
+        file_name = portfolio_name + '.json'
+        file_path = f"{self.folder}/{file_name}"
+        with open(file_path) as file:
             component_data = json.load(file)
-        portfolio = Portfolio()
+        portfolio = Portfolio(portfolio_name)
         for ticker, quantity in component_data.items():
             portfolio.add_asset(ticker, quantity)
         portfolio.calculate()
         return portfolio
-    
-    def list_portfolios(self):
-        self._create_portfolio_name_file_mapping()
-        self._create_portfolio_name_list()
-    
-    def _create_portfolio_name_file_mapping(self):
-        self.portfolio_names_and_files = {}
-        portfolio_files = self._list_portfolio_files()
-        for file in portfolio_files:
-            self.portfolio_names_and_files[file[:-5]] = file
 
-    def _create_portfolio_name_list(self):
-        self.portfolio_names_list =  [name for name in self.portfolio_names_and_files.keys()]
-
-    def _list_portfolio_files(self):
-        return [file for file in os.listdir(self.folder) if file[-5:]=='.json']
+    def list_portfolio_names(self):
+        self.portfolio_names_list = [file[:-5] for file in os.listdir(self.folder) if file[-5:]=='.json']
