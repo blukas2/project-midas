@@ -154,12 +154,15 @@ class Portfolio:
         reference_dates = self._get_all_reference_dates_for_annualized_returns(latest_date)
         self.volatility = {}
         for key, reference_date in reference_dates.items():
-            if self.history[self.history['Date']==reference_date].shape[0]>0:
-                filtered_df = self.history[self.history['Date']>=reference_date]
-                average_value = filtered_df['Value'].mean(skipna=True)
-                number_of_time_periods = filtered_df['Value'].count()
-                filtered_df['diff_squared_to_average'] = (filtered_df['Value']/average_value-1)**2
-                sum_of_diff_squared = filtered_df['diff_squared_to_average'].sum(skipna=True)
-                standard_deviation = (sum_of_diff_squared/number_of_time_periods)**(1/2)
-                volatility = standard_deviation*(number_of_time_periods**(1/2))
-                self.volatility[key] = volatility
+            if self.history[self.history['Date']==reference_date].shape[0]>0:                
+                self.volatility[key] = self._calculate_volatility_for_a_given_period(reference_date)
+
+    def _calculate_volatility_for_a_given_period(self, reference_date: date) -> float:
+        filtered_df = self.history[self.history['Date']>=reference_date]
+        average_value = filtered_df['Value'].mean(skipna=True)
+        number_of_time_periods = filtered_df['Value'].count()
+        filtered_df['diff_squared_to_average'] = (filtered_df['Value']/average_value-1)**2
+        sum_of_diff_squared = filtered_df['diff_squared_to_average'].sum(skipna=True)
+        standard_deviation = (sum_of_diff_squared/number_of_time_periods)**(1/2)
+        volatility = standard_deviation*(number_of_time_periods**(1/2))
+        return volatility
