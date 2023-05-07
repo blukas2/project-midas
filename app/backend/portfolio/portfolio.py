@@ -36,6 +36,7 @@ class Portfolio:
         self._calculate_returns()
         self._calculate_annualized_returns()
         self._calculate_correlation_matrix()
+        self._calculate_volatility()
 
     def _convert_asset_fx(self):
         for asset in self.content.values():
@@ -147,3 +148,18 @@ class Portfolio:
                 df = df.join(df_temp.set_index('Date'), on=['Date'], how='inner')
             counter += 1
         self.correlation_matrix = df.drop(columns=['Date']).corr()
+
+    def _calculate_volatility(self):
+        latest_date = self.history['Date'].max()
+        reference_dates = self._get_all_reference_dates_for_annualized_returns(latest_date)
+        self.volatility = {}
+        for key, reference_date in reference_dates.items():
+            if self.history[self.history['Date']==reference_date].shape[0]>0:
+                filtered_df = self.history[self.history['Date']>=reference_date]
+                average_value = filtered_df['Value'].mean(skipna=True)
+                number_of_time_periods = filtered_df['Value'].count()
+                filtered_df['diff_squared_to_average'] = (filtered_df['Value']/average_value-1)**2
+                sum_of_diff_squared = filtered_df['diff_squared_to_average'].sum(skipna=True)
+                standard_deviation = (sum_of_diff_squared/number_of_time_periods)**(1/2)
+                volatility = standard_deviation*(number_of_time_periods**(1/2))
+                self.volatility[key] = volatility

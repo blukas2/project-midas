@@ -50,11 +50,13 @@ class MainWindowComponents:
     def __init__(self, window, backend: BackEnd):
         self.window = window
         self.backend = backend
+        self.chart_dpi = 80
         self._define_buttons()
         self._define_asset_table()
         self.plot_history()
         self.plot_returns()
         self.plot_annualized_returns()
+        self.plot_volatility()
         self.plot_correlation_matrix()
         self._place_components()
         self.display_portfolio_name()
@@ -92,7 +94,7 @@ class MainWindowComponents:
         self.asset_table.heading("value",text='Value')
 
     def plot_history(self):
-        figure = pyplot.Figure(figsize=(6,4), dpi=100)
+        figure = pyplot.Figure(figsize=(6,4), dpi=self.chart_dpi)
         ax = figure.add_subplot(111)
         self.main_plot_canvas = FigureCanvasTkAgg(figure, self.window)        
         ax.set_title('Value History')
@@ -105,7 +107,7 @@ class MainWindowComponents:
         self.main_plot_canvas.get_tk_widget().grid(row = 2, column = 6, columnspan = 4)
 
     def plot_returns(self):
-        figure = Figure(figsize=(6, 3), dpi=100)
+        figure = Figure(figsize=(6, 3), dpi=self.chart_dpi)
         self.returns_plot_canvas = FigureCanvasTkAgg(figure, self.window)
         axes = figure.add_subplot()
         try:
@@ -121,7 +123,7 @@ class MainWindowComponents:
         self.returns_plot_canvas.get_tk_widget().grid(row = 3, column = 6, columnspan = 4)
 
     def plot_annualized_returns(self):
-        figure = Figure(figsize=(6, 3), dpi=100)
+        figure = Figure(figsize=(6, 3), dpi=self.chart_dpi)
         self.annualized_returns_plot_canvas = FigureCanvasTkAgg(figure, self.window)
         axes = figure.add_subplot()
         try:
@@ -135,6 +137,22 @@ class MainWindowComponents:
             axes.set_ylabel('%')
             axes.bar_label(bar)
         self.annualized_returns_plot_canvas.get_tk_widget().grid(row = 3, column = 11, columnspan = 4)
+
+    def plot_volatility(self):
+        figure = Figure(figsize=(6, 3), dpi=self.chart_dpi)
+        self.volatility_plot_canvas = FigureCanvasTkAgg(figure, self.window)
+        axes = figure.add_subplot()
+        try:
+            periods = self.backend.portfolio.volatility.keys()
+            returns = self.backend.portfolio.volatility.values()
+        except AttributeError:
+            pass
+        else:
+            bar = axes.bar(periods, returns)
+            axes.set_title('Portfolio Annualized Returns')
+            axes.set_ylabel('%')
+            axes.bar_label(bar)
+        self.volatility_plot_canvas.get_tk_widget().grid(row = 3, column = 1, columnspan = 4)
 
     def plot_correlation_matrix(self):
         f = tk.Frame(self.window)
@@ -159,6 +177,7 @@ class MainWindowComponents:
         self.plot_history()
         self.plot_returns()
         self.plot_annualized_returns()
+        self.plot_volatility()
         self.plot_correlation_matrix()
 
     def refresh_table(self):
