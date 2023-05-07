@@ -1,5 +1,5 @@
 from ui.ui import AppWindow
-from components.components import BackEnd
+from backend.backend import BackEnd
 
 def main():
     backend = BackEnd()

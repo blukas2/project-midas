@@ -6,7 +6,7 @@ from ui.main_window.main_window import MainWindowComponents, DropdownMenu
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from components.components import BackEnd
+    from backend.backend import BackEnd
 
 
 class AppWindow:

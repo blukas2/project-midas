@@ -1,74 +1,10 @@
-import os
-import pandas as pd
-import json
-from yfinance import Ticker
+
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from typing import Optional
 
-from globals.settings import FOLDER, CURRENCY
-
-class BackEnd:
-    def __init__(self):
-        self.portfolio = Portfolio()
-        self.file_manager = FileManager()
-
-    def load_portfolio(self, portfolio_name: str):
-        self.portfolio = self.file_manager.load_portfolio(portfolio_name)
-
-    def save_portfolio(self):
-        self.file_manager.save_portfolio(self.portfolio)
-
-    def new_portfolio(self, portfolio_name):
-        self.portfolio = Portfolio(portfolio_name)
-
-
-class CrossFx(Ticker):
-    def __init__(self, target_fx, source_fx):
-        ticker = f"{target_fx}{source_fx}=X"
-        super().__init__(ticker)
-        self.price_history = self._get_price_history()
-
-    def _get_price_history(self):
-        df = self.history(period="15y")
-        df = df.rename(columns={'Close': 'FX Rate'})
-        df.reset_index(inplace=True)
-        df['Date'] = pd.to_datetime(df['Date']).dt.date
-        return df
-
-
-
-class Asset(Ticker):
-    def __init__(self, ticker: str, quantity: int, session=None):
-        super().__init__(ticker, session)
-        self.quantity = quantity
-        self.price_history = self._get_price_history()
-        self.converted = False
-
-    def _get_price_history(self):
-        df = self.history(period="15y")
-        df = df[df['Volume']!=0]
-        df['Currency'] = self.info['currency']
-        df['Quantity'] = self.quantity
-        df = df.rename(columns={'Close': 'Price'})
-        df['Value'] = df['Price']*self.quantity
-        df.reset_index(inplace=True)
-        df['Date'] = pd.to_datetime(df['Date']).dt.date
-        return df
-    
-    def convert_fx(self, cross_fx: CrossFx):
-        self.price_history = self.price_history.join(cross_fx.price_history[['Date', 'FX Rate']].set_index('Date'), on=['Date'], how='left', rsuffix='_fx')
-        self.price_history['Price Original Fx'] = self.price_history['Price']
-        self.price_history['Value Original Fx'] = self.price_history['Value']
-        self.price_history['Price'] = self.price_history['Price']/self.price_history['FX Rate']
-        self.price_history['Value'] = self.price_history['Value']/self.price_history['FX Rate']
-        self.converted = True
-
-    def change_quantity(self, quantity_change):
-        if self.quantity + quantity_change < 0:
-            raise ValueError("The quantity of an asset cannot be decreased by more than its current quantity")
-        self.quantity = self.quantity + quantity_change
-
+from backend.globals.settings import CURRENCY
+from backend.portfolio.components import Asset, CrossFx
 
 class Portfolio:
     def __init__(self, name: Optional[str] = None):
@@ -211,28 +147,3 @@ class Portfolio:
                 df = df.join(df_temp.set_index('Date'), on=['Date'], how='inner')
             counter += 1
         self.correlation_matrix = df.drop(columns=['Date']).corr()
-
-class FileManager:
-    def __init__(self):
-        self.folder = FOLDER
-    
-    def save_portfolio(self, portfolio: Portfolio):        
-        component_data = portfolio.retrieve_component_data()
-        file_name = portfolio.name + '.json'
-        file_path = f"{self.folder}/{file_name}"
-        with open(file_path, mode="w+") as file:
-            file.write(json.dumps(component_data))
-
-    def load_portfolio(self, portfolio_name):
-        file_name = portfolio_name + '.json'
-        file_path = f"{self.folder}/{file_name}"
-        with open(file_path) as file:
-            component_data = json.load(file)
-        portfolio = Portfolio(portfolio_name)
-        for ticker, quantity in component_data.items():
-            portfolio.add_asset(ticker, quantity)
-        portfolio.calculate()
-        return portfolio
-
-    def list_portfolio_names(self):
-        self.portfolio_names_list = [file[:-5] for file in os.listdir(self.folder) if file[-5:]=='.json']

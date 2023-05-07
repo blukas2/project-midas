@@ -5,7 +5,7 @@ from tkinter import messagebox as msgbox
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from components.components import BackEnd
+    from backend.backend import BackEnd
     from ui.main_window.main_window import MainWindowComponents
 
 
