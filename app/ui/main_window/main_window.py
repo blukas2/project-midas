@@ -11,6 +11,7 @@ import pandas as pd
 from pandastable import Table, config
 
 from ui.main_window.popups import *
+from ui.compare.compare import CompareWindow
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -25,12 +26,21 @@ class DropdownMenu:
         self.backend = backend
         root.config(menu=self.menu)
         
+        self._define_portfolio_menu()
+        self._define_analysis_menu()
+
+    def _define_portfolio_menu(self):
         self.portfolio_menu = tk.Menu(self.menu)
         self.menu.add_cascade(label='Portfolio', menu=self.portfolio_menu)
         self.portfolio_menu.add_command(label="New", command=self._new_portfolio)
         self.portfolio_menu.add_command(label="Open", command=self._open_portfolio)
         self.portfolio_menu.add_command(label="Save", command=self._save_portfolio)
         self.portfolio_menu.add_command(label="Exit", command=self._exit_command)
+
+    def _define_analysis_menu(self):
+        self.analysis_menu = tk.Menu(self.menu)
+        self.menu.add_cascade(label='Analysis', menu=self.analysis_menu)
+        self.analysis_menu.add_command(label="Compare", command=self._compare_assets)
 
     def _open_portfolio(self):
         self.backend.file_manager.list_portfolio_names()
@@ -44,6 +54,11 @@ class DropdownMenu:
 
     def _exit_command(self):
         self.root.destroy()
+
+    def _compare_assets(self):
+        CompareWindow(self.root)
+
+
 
 
 class MainWindowComponents:
@@ -149,7 +164,7 @@ class MainWindowComponents:
             pass
         else:
             bar = axes.bar(periods, returns)
-            axes.set_title('Portfolio Annualized Returns')
+            axes.set_title('Portfolio Volatility')
             axes.set_ylabel('%')
             axes.bar_label(bar)
         self.volatility_plot_canvas.get_tk_widget().grid(row = 3, column = 1, columnspan = 4)
