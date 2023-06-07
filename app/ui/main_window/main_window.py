@@ -56,7 +56,7 @@ class DropdownMenu:
         self.root.destroy()
 
     def _compare_assets(self):
-        CompareWindow(self.root)
+        CompareWindow(self.root, self.backend)
 
 
 
