@@ -40,10 +40,10 @@ class Portfolio:
 
     def _convert_asset_fx(self):
         for asset in self.content.values():
-            if (asset.info['currency']!= CURRENCY) and (asset.converted is False):
-                fx_ticker = asset.info['currency'] + CURRENCY
+            if (asset.fast_info['currency']!= CURRENCY) and (asset.converted is False):
+                fx_ticker = asset.fast_info['currency'] + CURRENCY
                 if fx_ticker not in self.fx_rates:
-                    self.fx_rates[fx_ticker] = CrossFx(target_fx=CURRENCY, source_fx=asset.info['currency'])
+                    self.fx_rates[fx_ticker] = CrossFx(target_fx=CURRENCY, source_fx=asset.fast_info['currency'])
                 asset.convert_fx(self.fx_rates[fx_ticker])
 
     def _calculate_history(self):

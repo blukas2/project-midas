@@ -201,7 +201,7 @@ class MainWindowComponents:
             iid = len(self.asset_table.get_children())
             self.asset_table.insert(parent='',index='end',iid=iid,text='',
                                     values=(asset.ticker,
-                                            asset.info['longName'],
+                                            asset.get_longname(),
                                             asset.quantity,
-                                            asset.info['regularMarketPreviousClose'],
-                                            asset.info['regularMarketPreviousClose']*asset.quantity))
+                                            asset.fast_info['regularMarketPreviousClose'],
+                                            asset.fast_info['regularMarketPreviousClose']*asset.quantity))

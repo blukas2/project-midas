@@ -10,8 +10,8 @@ class Comparer:
     def compare(self, ticker1, ticker2):
         self.asset1 = Asset(ticker1, 1)
         self.asset2 = Asset(ticker2, 1)
-        self.asset1_name = self.asset1.info['longName']
-        self.asset2_name = self.asset2.info['longName']
+        self.asset1_name = self.asset1.get_longname()
+        self.asset2_name = self.asset2.get_longname()
         self._create_compare_table()
         self._calculate_price_indicies()
         self._calculate_annualized_returns()

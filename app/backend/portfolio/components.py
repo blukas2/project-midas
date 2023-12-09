@@ -1,6 +1,7 @@
 
 import pandas as pd
 from yfinance import Ticker
+import requests
 
 
 class CrossFx(Ticker):
@@ -27,7 +28,7 @@ class Asset(Ticker):
     def _get_price_history(self):
         df = self.history(period="15y")
         df = df[df['Volume']!=0]
-        df['Currency'] = self.info['currency']
+        df['Currency'] = self.fast_info['currency']
         df['Quantity'] = self.quantity
         df = df.rename(columns={'Close': 'Price'})
         df['Value'] = df['Price']*self.quantity
@@ -47,3 +48,9 @@ class Asset(Ticker):
         if self.quantity + quantity_change < 0:
             raise ValueError("The quantity of an asset cannot be decreased by more than its current quantity")
         self.quantity = self.quantity + quantity_change
+
+    def get_longname(self):
+        try:
+            return self.info['longName']
+        except requests.exceptions.HTTPError:
+            return self.ticker
