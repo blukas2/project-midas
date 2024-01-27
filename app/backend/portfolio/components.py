@@ -52,5 +52,5 @@ class Asset(Ticker):
     def get_longname(self):
         try:
             return self.info['longName']
-        except requests.exceptions.HTTPError:
+        except (requests.exceptions.HTTPError, TypeError):
             return self.ticker

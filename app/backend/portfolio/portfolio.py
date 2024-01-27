@@ -56,6 +56,7 @@ class Portfolio:
                 self.history = self.history.join(asset.price_history[['Date', 'Value']].set_index('Date'), on=['Date'], how='inner', rsuffix='_new')
                 self.history['Value'] = self.history['Value'] + self.history['Value_new']
                 self.history = self.history.drop(columns=['Value_new'])
+        self.history = self.history.dropna()
     
     def _calculate_returns(self):
         latest_date = self.history['Date'].max()
