@@ -1,16 +1,25 @@
-
+import json
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from typing import Optional
 
-from backend.globals.settings import CURRENCY
+from backend.globals.settings import CURRENCY, ASSET_NAMES_FILE
 from backend.portfolio.components import Asset, CrossFx
+
 
 class Portfolio:
     def __init__(self, name: Optional[str] = None):
         self.name = name
         self.content: dict[str,Asset] = {}
         self.fx_rates: dict[str, CrossFx] = {}
+        self.asset_names_dict = self._load_asset_name_dictionary()
+
+    def _load_asset_name_dictionary(self) -> dict[str, str]:
+        try:
+            with open(ASSET_NAMES_FILE) as file:
+                return json.load(file)
+        except Exception:
+            return {}
 
     def add_asset(self, ticker: str, quantity: int):
         if quantity<0:
@@ -18,7 +27,14 @@ class Portfolio:
         if ticker in self.content:
                 self.content[ticker].change_quantity(quantity)
         else:
-            self.content[ticker] = Asset(ticker, quantity)
+            long_name = self._retrieve_long_name(ticker)
+            self.content[ticker] = Asset(ticker, quantity, long_name=long_name)
+
+    def _retrieve_long_name(self, ticker: str) -> Optional[str]:
+        try:
+            return self.asset_names_dict[ticker]
+        except KeyError:
+            return None
 
     def reduce_position(self, ticker: str, quantity: int):
         if ticker not in self.content:

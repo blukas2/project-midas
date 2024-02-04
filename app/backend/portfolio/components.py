@@ -3,6 +3,8 @@ import pandas as pd
 from yfinance import Ticker
 import requests
 
+from typing import Optional
+
 
 class CrossFx(Ticker):
     def __init__(self, target_fx, source_fx):
@@ -19,11 +21,12 @@ class CrossFx(Ticker):
 
 
 class Asset(Ticker):
-    def __init__(self, ticker: str, quantity: int, session=None):
+    def __init__(self, ticker: str, quantity: int, long_name: Optional[str] = None, session=None):
         super().__init__(ticker, session)
         self.quantity = quantity
         self.price_history = self._get_price_history()
         self.converted = False
+        self.long_name = long_name
 
     def _get_price_history(self):
         df = self.history(period="15y")
@@ -37,7 +40,10 @@ class Asset(Ticker):
         return df
     
     def convert_fx(self, cross_fx: CrossFx):
-        self.price_history = self.price_history.join(cross_fx.price_history[['Date', 'FX Rate']].set_index('Date'), on=['Date'], how='left', rsuffix='_fx')
+        self.price_history = (self.price_history
+                              .join(cross_fx.price_history[['Date', 'FX Rate']]
+                                    .set_index('Date'), on=['Date'], 
+                                    how='left', rsuffix='_fx'))
         self.price_history['Price Original Fx'] = self.price_history['Price']
         self.price_history['Value Original Fx'] = self.price_history['Value']
         self.price_history['Price'] = self.price_history['Price']/self.price_history['FX Rate']
@@ -50,7 +56,10 @@ class Asset(Ticker):
         self.quantity = self.quantity + quantity_change
 
     def get_longname(self):
-        try:
-            return self.info['longName']
-        except (requests.exceptions.HTTPError, TypeError):
-            return self.ticker
+        if self.long_name is not None:
+            return self.long_name
+        else:
+            try:
+                return self.info['longName']
+            except (requests.exceptions.HTTPError, TypeError):
+                return self.ticker
