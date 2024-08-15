@@ -37,6 +37,11 @@ class Asset(Ticker):
         df['Value'] = df['Price']*self.quantity
         df.reset_index(inplace=True)
         df['Date'] = pd.to_datetime(df['Date']).dt.date
+        
+        # later add this to a logging funcion/method
+        max_date = df["Date"].max()
+        min_date = df["Date"].min()
+        print(f"Asset: {self.ticker}, from: {min_date}, to {max_date}") 
         return df
     
     def convert_fx(self, cross_fx: CrossFx):

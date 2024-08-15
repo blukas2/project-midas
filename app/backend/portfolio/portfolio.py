@@ -156,7 +156,7 @@ class Portfolio:
     def _calculate_correlation_matrix(self):
         counter = 1
         for ticker, asset in self.content.items():
-            df_temp = asset.price_history[['Date', 'Price']]
+            df_temp = asset.price_history[['Date', 'Price']].copy(deep=True)
             df_temp[ticker] = df_temp['Price']
             df_temp = df_temp.drop(columns=['Price'])
             if counter == 1:
