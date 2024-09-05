@@ -3,7 +3,7 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from typing import Optional
 
-from backend.globals.settings import CURRENCY, ASSET_NAMES_FILE
+from backend.globals.config import CURRENCY, ASSET_NAMES_FILE
 from backend.portfolio.components import Asset, CrossFx
 
 
