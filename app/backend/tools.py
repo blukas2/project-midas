@@ -3,7 +3,7 @@ import json
 import pandas as pd
 from pandas import DataFrame
 
-from backend.globals.config import PORTFOLIOS_FOLDER
+from backend.globals.config import ROOT_FOLDER, PORTFOLIOS_FOLDER
 from backend.portfolio.portfolio import Portfolio
 
 
@@ -62,14 +62,20 @@ class FileManager:
         return date_value
     
     def _read_portfolio_data(self, portfolio_name: str, file_name: str) -> DataFrame:
-        portfolio_df = pd.read_csv(f"{self.folder}/{portfolio_name}/{file_name}", sep=";", encoding="utf-16")
-        portfolio_df.rename({
-            "ISIN": "isin",
-            "Titel": "name",
-            "Menge": "quantity"
-        }, inplace=True)
+        portfolio_df = pd.read_csv(f"{PORTFOLIOS_FOLDER}/{portfolio_name}/{file_name}", sep=";", encoding="utf-16")
+        portfolio_df.rename(
+            columns={
+                "ISIN": "isin",
+                "Titel": "name",
+                "Menge": "quantity"
+            }, inplace=True)
         portfolio_df = portfolio_df[["isin", "name", "quantity"]]
-        asset_names_df = pd.read_csv(f"{self.folder}/asset_names.csv", sep=";")
+        portfolio_df["quantity"] = (
+            portfolio_df["quantity"]
+            .str.replace(".", "").str.replace(",", ".")
+            .astype(float).astype(int)
+        )
+        asset_names_df = pd.read_csv(f"{ROOT_FOLDER}/asset_names.csv", sep=";", encoding="ISO-8859-1")
         portfolio_df = portfolio_df.merge(asset_names_df, on="isin", how="left")
         return portfolio_df
 
