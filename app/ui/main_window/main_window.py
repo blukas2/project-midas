@@ -203,5 +203,5 @@ class MainWindowComponents:
                                     values=(asset.ticker,
                                             asset.get_longname(),
                                             asset.quantity,
-                                            asset.fast_info['previousClose'],
-                                            asset.fast_info['previousClose']*asset.quantity))
+                                            round(asset.fast_info['previousClose'],2),
+                                            round(asset.fast_info['previousClose']*asset.quantity)))
