@@ -104,6 +104,6 @@ class ReturnsCalculator:
         filtered_df['diff_squared_to_average'] = (filtered_df[self.source_column]/average_value-1)**2
         sum_of_diff_squared = filtered_df['diff_squared_to_average'].sum(skipna=True)
         standard_deviation = (sum_of_diff_squared/number_of_time_periods)**(1/2)
-        volatility = standard_deviation*(number_of_time_periods**(1/2))
+        volatility = standard_deviation#*(number_of_time_periods**(1/2))
         return volatility
     

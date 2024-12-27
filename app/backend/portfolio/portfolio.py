@@ -176,10 +176,11 @@ class Portfolio:
 
     def _calculate_volatility_for_a_given_period(self, reference_date: date) -> float:
         filtered_df = self.history[self.history['Date']>=reference_date]
+        #volatility = filtered_df['Value'].std(skipna=True)
         average_value = filtered_df['Value'].mean(skipna=True)
         number_of_time_periods = filtered_df['Value'].count()
         filtered_df['diff_squared_to_average'] = (filtered_df['Value']/average_value-1)**2
         sum_of_diff_squared = filtered_df['diff_squared_to_average'].sum(skipna=True)
         standard_deviation = (sum_of_diff_squared/number_of_time_periods)**(1/2)
-        volatility = standard_deviation*(number_of_time_periods**(1/2))
+        volatility = standard_deviation*100#*(number_of_time_periods**(1/2))
         return volatility
