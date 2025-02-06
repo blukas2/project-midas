@@ -1,9 +1,12 @@
+from future import __annotations__
 
 import pandas as pd
 from yfinance import Ticker
 import requests
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+if TYPE_CHECKING:
+    from backend.portfolio.components import Asset
 
 
 class CrossFx(Ticker):
@@ -21,12 +24,17 @@ class CrossFx(Ticker):
 
 
 class Asset(Ticker):
-    def __init__(self, ticker: str, quantity: int, long_name: Optional[str] = None, session=None):
+    def __init__(
+            self, ticker: str, quantity: int, long_name: Optional[str] = None,
+            reference_asset: Optional[Asset] = None, session=None
+        ):
         super().__init__(ticker, session)
         self.quantity = quantity
+        self.reference_asset = reference_asset
         self.price_history = self._get_price_history()
         self.converted = False
         self.long_name = long_name
+        
 
     def _get_price_history(self):
         df = self.history(period="15y")

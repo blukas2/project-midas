@@ -5,6 +5,7 @@ from typing import Optional
 
 from backend.globals.config import CURRENCY, ASSET_NAMES_FILE
 from backend.portfolio.components import Asset, CrossFx
+from backend.portfolio.reference_assets import ReferenceAssets
 
 
 class Portfolio:
@@ -13,6 +14,7 @@ class Portfolio:
         self.content: dict[str,Asset] = {}
         self.fx_rates: dict[str, CrossFx] = {}
         self.asset_names_dict = self._load_asset_name_dictionary()
+        self.reference_assets = ReferenceAssets()
 
     def _load_asset_name_dictionary(self) -> dict[str, str]:
         try:
@@ -27,7 +29,8 @@ class Portfolio:
         if ticker in self.content:
                 self.content[ticker].change_quantity(quantity)
         else:
-            long_name = self._retrieve_long_name(ticker)
+            long_name = self.reference_assets.retrieve_long_name(ticker)
+            #long_name = self._retrieve_long_name(ticker)
             self.content[ticker] = Asset(ticker, quantity, long_name=long_name)
 
     def _retrieve_long_name(self, ticker: str) -> Optional[str]:
