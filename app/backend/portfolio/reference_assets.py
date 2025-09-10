@@ -9,6 +9,7 @@ from typing import Optional
 class ReferenceAssets:
     def __init__(self):
         self.asset_names_df = pd.read_csv(f"{ROOT_FOLDER}/asset_names.csv", sep=";", encoding="ISO-8859-1")
+        self.asset_names_df = self.asset_names_df.where(pd.notnull(self.asset_names_df), None)
         self.asset_names_records = self.asset_names_df.to_dict(orient="records")
         self.long_name_dict = {record["ticker"]: record["long_name"] for record in self.asset_names_records}
         self.reference_ticker_dict = {record["ticker"]: record["reference_ticker"] for record in self.asset_names_records}
@@ -25,6 +26,7 @@ class ReferenceAssets:
         """Returns the reference asset for a given ticker"""
         reference_ticker = self.retrieve_reference_ticker(ticker)
         if reference_ticker:
+            print(f"Reference asset for {ticker} is {reference_ticker}")
             if reference_ticker not in self.repository:
                 self.repository[reference_ticker] = Asset(reference_ticker, 1)
             return self.repository[reference_ticker]

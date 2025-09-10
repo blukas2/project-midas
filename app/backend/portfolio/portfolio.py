@@ -30,8 +30,8 @@ class Portfolio:
                 self.content[ticker].change_quantity(quantity)
         else:
             long_name = self.reference_assets.retrieve_long_name(ticker)
-            #long_name = self._retrieve_long_name(ticker)
-            self.content[ticker] = Asset(ticker, quantity, long_name=long_name)
+            reference_asset = self.reference_assets.get_reference_asset(ticker)
+            self.content[ticker] = Asset(ticker, quantity, long_name=long_name, reference_asset=reference_asset)
 
     def _retrieve_long_name(self, ticker: str) -> Optional[str]:
         try:

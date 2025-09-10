@@ -42,7 +42,11 @@ class FileManager:
         portfolio_items = portfolio_df.to_dict(orient="records")
         portfolio = Portfolio(portfolio_name)
         for item in portfolio_items:
-            portfolio.add_asset(item["ticker"], item["quantity"])
+            try:
+                portfolio.add_asset(item["ticker"], item["quantity"])
+            except Exception as e:
+                print(f"Error adding {item['ticker']} with ISIN {item['isin']} to portfolio {portfolio_name}.")
+                raise e
         return portfolio
 
     def _get_latest_portfolio_filename(self, portfolio_name: str) -> str:
@@ -77,6 +81,7 @@ class FileManager:
         )
         asset_names_df = pd.read_csv(f"{ROOT_FOLDER}/asset_names.csv", sep=";", encoding="ISO-8859-1")
         portfolio_df = portfolio_df.merge(asset_names_df, on="isin", how="left")
+        print(portfolio_df)
         return portfolio_df
 
     def list_portfolio_names(self):

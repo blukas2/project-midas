@@ -1,8 +1,10 @@
-from future import __annotations__
+from __future__ import annotations
 
 import pandas as pd
 from yfinance import Ticker
 import requests
+
+from backend.portfolio.backcast import Backcast
 
 from typing import Optional, TYPE_CHECKING
 if TYPE_CHECKING:
@@ -46,10 +48,17 @@ class Asset(Ticker):
         df.reset_index(inplace=True)
         df['Date'] = pd.to_datetime(df['Date']).dt.date
         
+        if self.reference_asset is not None:
+            backcast = Backcast(df, self.reference_asset.price_history)
+            df = backcast.run()
+            print(f"Backcasted {self.ticker} with reference asset {self.reference_asset.ticker}")
+            print(df)
+        
         # later add this to a logging funcion/method
         max_date = df["Date"].max()
         min_date = df["Date"].min()
-        print(f"Asset: {self.ticker}, from: {min_date}, to {max_date}") 
+        print(f"Asset: {self.ticker}, from: {min_date}, to {max_date}")
+
         return df
     
     def convert_fx(self, cross_fx: CrossFx):
