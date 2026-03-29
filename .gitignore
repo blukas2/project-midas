@@ -3,3 +3,4 @@ location.py
 __pycache__
 *cpython*
 /app/backend/globals/settings.py
+.logs

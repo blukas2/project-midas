@@ -1,0 +1,12 @@
+Fix table top left
+    - add labels to rows as well
+    - add coloring
+
+When adding a new item to the portfolio
+    - show chart overlay
+    - calculate co-variance
+
+
+New metrics:
+    - Sharpe ratio
+    - other

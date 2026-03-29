@@ -1,9 +1,13 @@
+import logging
+
 import pandas as pd
 
 from backend.globals.config import ROOT_FOLDER
 from backend.portfolio.components import Asset
 
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class ReferenceAssets:
@@ -26,7 +30,7 @@ class ReferenceAssets:
         """Returns the reference asset for a given ticker"""
         reference_ticker = self.retrieve_reference_ticker(ticker)
         if reference_ticker:
-            print(f"Reference asset for {ticker} is {reference_ticker}")
+            logger.info("Reference asset for %s is %s", ticker, reference_ticker)
             if reference_ticker not in self.repository:
                 self.repository[reference_ticker] = Asset(reference_ticker, 1)
             return self.repository[reference_ticker]

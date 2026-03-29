@@ -1,10 +1,13 @@
 import os
 import json
+import logging
 import pandas as pd
 from pandas import DataFrame
 
 from backend.globals.config import ROOT_FOLDER, PORTFOLIOS_FOLDER
 from backend.portfolio.portfolio import Portfolio
+
+logger = logging.getLogger(__name__)
 
 
 class FileManager:
@@ -45,7 +48,7 @@ class FileManager:
             try:
                 portfolio.add_asset(item["ticker"], item["quantity"])
             except Exception as e:
-                print(f"Error adding {item['ticker']} with ISIN {item['isin']} to portfolio {portfolio_name}.")
+                logger.error("Error adding %s to portfolio %s.", item['ticker'], portfolio_name)
                 raise e
         return portfolio
 
@@ -81,7 +84,7 @@ class FileManager:
         )
         asset_names_df = pd.read_csv(f"{ROOT_FOLDER}/asset_names.csv", sep=";", encoding="ISO-8859-1")
         portfolio_df = portfolio_df.merge(asset_names_df, on="isin", how="left")
-        print(portfolio_df)
+        logger.debug("Loaded portfolio data with %d assets.", len(portfolio_df))
         return portfolio_df
 
     def list_portfolio_names(self):

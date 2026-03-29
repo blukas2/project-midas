@@ -47,7 +47,3 @@ plt.plot(df_train["asset_pct_pred"], label="lyp6de_pred")
 plt.legend()
 plt.show()
 
-
-#ticker_stoxx = Ticker("LYP6.DE")
-#df_stoxx = ticker_stoxx.history()  
-
