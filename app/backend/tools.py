@@ -4,6 +4,8 @@ import logging
 import pandas as pd
 from pandas import DataFrame
 
+import yfinance as yf
+
 from backend.globals.config import ROOT_FOLDER, PORTFOLIOS_FOLDER
 from backend.portfolio.portfolio import Portfolio
 
@@ -97,3 +99,36 @@ class FileManager:
             else:
                 raise ValueError("Invalid portfolio item.")                
         self.portfolio_names_list = names_list
+
+
+class AssetSearchResult:
+    """Represents a single found asset with its ticker and name."""
+
+    def __init__(self, ticker: str, long_name: str, asset_type: str):
+        self.ticker = ticker
+        self.long_name = long_name
+        self.asset_type = asset_type
+
+    def __repr__(self) -> str:
+        return f"{self.ticker} - {self.long_name} ({self.asset_type})"
+
+
+class AssetFinder:
+    """Finds financial asset tickers by searching long names and symbols."""
+
+    def find_assets(self, query: str) -> list[AssetSearchResult]:
+        """Search for assets matching the query by name or ticker."""
+        search = yf.Search(query)
+        return self._parse_results(search.quotes)
+
+    def _parse_results(self, quotes: list[dict]) -> list[AssetSearchResult]:
+        """Parse raw search quotes into AssetSearchResult objects."""
+        return [self._parse_quote(quote) for quote in quotes]
+
+    def _parse_quote(self, quote: dict) -> AssetSearchResult:
+        """Parse a single quote dictionary into an AssetSearchResult."""
+        return AssetSearchResult(
+            ticker=quote.get("symbol", "N/A"),
+            long_name=quote.get("longname", quote.get("shortname", "N/A")),
+            asset_type=quote.get("quoteType", "N/A"),
+        )

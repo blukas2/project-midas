@@ -3,6 +3,8 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox as msgbox
 
+from ui.assets.find_asset import FindAssetForPositionWindow
+
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from backend.backend import BackEnd
@@ -25,6 +27,7 @@ class ChangePositionWindow:
         self.lbl_quantity = tk.Label(self.window, text="Quantity")
         self.entry_quantity = tk.Entry(self.window, width = 10, borderwidth = 5)
         
+        self.btn_find_asset = tk.Button(self.window, text="Find Asset", command=self._open_find_asset)
         self.btn_add = tk.Button(self.window,text ="Add", command = self.add_asset)
         self.btn_remove = tk.Button(self.window,text ="Reduce", command=self.reduce_position)
         self.btn_cancel = tk.Button(self.window,text ="Cancel", command = self.close)
@@ -35,9 +38,17 @@ class ChangePositionWindow:
         self.lbl_quantity.grid(row = 1, column = 3, columnspan = 1)
         self.entry_quantity.grid(row = 1, column = 4, columnspan = 1)
 
+        self.btn_find_asset.grid(row = 2, column = 1, columnspan = 1)
         self.btn_add.grid(row = 2, column = 2, columnspan = 1)
         self.btn_remove.grid(row = 2, column = 3, columnspan = 1)
         self.btn_cancel.grid(row = 2, column = 4, columnspan = 1)
+
+    def _open_find_asset(self):
+        FindAssetForPositionWindow(self.window, self.backend, self._prefill_ticker)
+
+    def _prefill_ticker(self, ticker: str):
+        self.entry_ticker.delete(0, tk.END)
+        self.entry_ticker.insert(0, ticker)
 
     def add_asset(self):
         try:

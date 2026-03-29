@@ -12,6 +12,7 @@ from pandastable import Table, config
 
 from ui.main_window.popups import *
 from ui.compare.compare import CompareWindow
+from ui.assets.find_asset import FindAssetWindow
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -27,6 +28,7 @@ class DropdownMenu:
         root.config(menu=self.menu)
         
         self._define_portfolio_menu()
+        self._define_assets_menu()
         self._define_analysis_menu()
 
     def _define_portfolio_menu(self):
@@ -41,6 +43,11 @@ class DropdownMenu:
         self.analysis_menu = tk.Menu(self.menu)
         self.menu.add_cascade(label='Analysis', menu=self.analysis_menu)
         self.analysis_menu.add_command(label="Compare", command=self._compare_assets)
+
+    def _define_assets_menu(self):
+        self.assets_menu = tk.Menu(self.menu)
+        self.menu.add_cascade(label='Assets', menu=self.assets_menu)
+        self.assets_menu.add_command(label="Find Asset...", command=self._find_asset)
 
     def _open_portfolio(self):
         self.backend.file_manager.list_portfolio_names()
@@ -57,6 +64,9 @@ class DropdownMenu:
 
     def _compare_assets(self):
         CompareWindow(self.root, self.backend)
+
+    def _find_asset(self):
+        FindAssetWindow(self.root, self.backend)
 
 
 

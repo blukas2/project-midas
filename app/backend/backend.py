@@ -1,5 +1,6 @@
 from backend.portfolio.portfolio import Portfolio
 from backend.comparer.comparer import Comparer
+from backend.asset_analyzer import AssetAnalyzer
 from backend.tools import FileManager
 
 class BackEnd:
@@ -7,6 +8,7 @@ class BackEnd:
         self.portfolio = Portfolio()
         self.file_manager = FileManager()
         self.comparer = Comparer()
+        self.asset_analyzer = AssetAnalyzer()
 
     def load_portfolio(self, portfolio_name: str):
         self.portfolio = self.file_manager.load_portfolio(portfolio_name)
