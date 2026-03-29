@@ -221,3 +221,34 @@ class FindAssetForPositionWindow(FindAssetWindow):
 
     def _cancel(self):
         self.window.destroy()
+
+
+class FindAssetForCompareWindow(FindAssetWindow):
+    """Find Asset window launched from Compare Assets, with Select/Cancel buttons."""
+
+    def __init__(self, master, backend: BackEnd, on_select_callback: Callable[[str], None]):
+        self.on_select_callback = on_select_callback
+        self.selected_ticker: str | None = None
+        super().__init__(master, backend)
+
+    def _place_components(self):
+        super()._place_components()
+        self.btn_select = tk.Button(self.window, text="Select Asset", command=self._select_asset)
+        self.btn_cancel = tk.Button(self.window, text="Cancel", command=self._cancel)
+        self.btn_select.grid(row=6, column=2, pady=5)
+        self.btn_cancel.grid(row=6, column=3, pady=5)
+
+    def _on_select(self, event):
+        selection = self.listbox_results.curselection()
+        if not selection:
+            return
+        self.selected_ticker = self.search_results[selection[0]].ticker
+        super()._on_select(event)
+
+    def _select_asset(self):
+        if self.selected_ticker:
+            self.on_select_callback(self.selected_ticker)
+        self.window.destroy()
+
+    def _cancel(self):
+        self.window.destroy()

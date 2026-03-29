@@ -7,6 +7,8 @@ from matplotlib import pyplot
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+from ui.assets.find_asset import FindAssetForCompareWindow
+
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from backend.backend import BackEnd
@@ -17,6 +19,8 @@ class CompareWindow:
         self.window.title("Compare assets")
         self.backend = backend
         self.chart_dpi = 80
+        self._use_portfolio_for_asset1 = False
+        self._use_portfolio_for_asset2 = False
         self._define_components()
         self._place_components()
 
@@ -26,28 +30,54 @@ class CompareWindow:
         self.lbl_asset2_title = tk.Label(self.window, text="Asset 2: ")
         self.entry_asset1_ticker = tk.Entry(self.window, width = 10, borderwidth = 5)
         self.entry_asset2_ticker = tk.Entry(self.window, width = 10, borderwidth = 5)
+        self.btn_find_asset1 = tk.Button(self.window, text="Find Asset", command=self._open_find_asset1)
+        self.btn_find_asset2 = tk.Button(self.window, text="Find Asset", command=self._open_find_asset2)
+        self.btn_portfolio_asset1 = tk.Button(self.window, text="Use Portfolio", command=self._use_portfolio_as_asset1)
+        self.btn_portfolio_asset2 = tk.Button(self.window, text="Use Portfolio", command=self._use_portfolio_as_asset2)
         self.btn_compare = tk.Button(self.window,text ="Compare!", command = self.compare)
 
     def _place_components(self):
         self.lbl_asset1_title.grid(row = 1, column = 1, columnspan = 1)
-        self.lbl_asset2_title.grid(row = 1, column = 3, columnspan = 1)
         self.entry_asset1_ticker.grid(row = 1, column = 2, columnspan = 1)
-        self.entry_asset2_ticker.grid(row = 1, column = 4, columnspan = 1)
-        self.btn_compare.grid(row = 2, column = 2, columnspan = 2)
+        self.btn_find_asset1.grid(row = 1, column = 3, columnspan = 1)
+        self.btn_portfolio_asset1.grid(row = 1, column = 4, columnspan = 1)
+        self.lbl_asset2_title.grid(row = 2, column = 1, columnspan = 1)
+        self.entry_asset2_ticker.grid(row = 2, column = 2, columnspan = 1)
+        self.btn_find_asset2.grid(row = 2, column = 3, columnspan = 1)
+        self.btn_portfolio_asset2.grid(row = 2, column = 4, columnspan = 1)
+        self.btn_compare.grid(row = 3, column = 1, columnspan = 4)
 
     def compare(self):
-        asset1_ticker = self._read_ticker(self.entry_asset1_ticker, 'Asset 1')
-        asset2_ticker = self._read_ticker(self.entry_asset2_ticker, 'Asset 2')
-        if (asset1_ticker is not None) and (asset2_ticker is not None):
-            try:
-                self.backend.comparer.compare(asset1_ticker, asset2_ticker)
-            except AttributeError:
-                msgbox.showerror(title="ERROR!", message='No data found, on of the symbols may be delisted.')
-            else:
-                self._display_asset_names()
-                self._plot_history_comparison()
-                self._plot_annualized_returns_asset1()
-                self._plot_annualized_returns_asset2()
+        try:
+            self._run_comparison()
+        except AttributeError:
+            msgbox.showerror(title="ERROR!", message='No data found, one of the symbols may be delisted.')
+        else:
+            self._display_asset_names()
+            self._plot_history_comparison()
+            self._plot_annualized_returns_asset1()
+            self._plot_annualized_returns_asset2()
+            self._plot_volatility_asset1()
+            self._plot_volatility_asset2()
+
+    def _run_comparison(self):
+        portfolio = self.backend.portfolio
+        if self._use_portfolio_for_asset1 and self._use_portfolio_for_asset2:
+            msgbox.showerror(title="ERROR!", message='Cannot use portfolio for both assets.')
+            return
+        if self._use_portfolio_for_asset1:
+            ticker = self._read_ticker(self.entry_asset2_ticker, 'Asset 2')
+            if ticker is not None:
+                self.backend.comparer.compare_with_portfolio(portfolio, ticker, 1)
+        elif self._use_portfolio_for_asset2:
+            ticker = self._read_ticker(self.entry_asset1_ticker, 'Asset 1')
+            if ticker is not None:
+                self.backend.comparer.compare_with_portfolio(portfolio, ticker, 2)
+        else:
+            asset1 = self._read_ticker(self.entry_asset1_ticker, 'Asset 1')
+            asset2 = self._read_ticker(self.entry_asset2_ticker, 'Asset 2')
+            if (asset1 is not None) and (asset2 is not None):
+                self.backend.comparer.compare(asset1, asset2)
 
     def _read_ticker(self, entry: tk.Entry, entry_name):
         try:
@@ -57,11 +87,53 @@ class CompareWindow:
         else:
             return ticker
         
+    def _use_portfolio_as_asset1(self):
+        if not self._is_portfolio_loaded():
+            return
+        self._use_portfolio_for_asset1 = True
+        self._set_entry_to_portfolio_name(self.entry_asset1_ticker)
+
+    def _use_portfolio_as_asset2(self):
+        if not self._is_portfolio_loaded():
+            return
+        self._use_portfolio_for_asset2 = True
+        self._set_entry_to_portfolio_name(self.entry_asset2_ticker)
+
+    def _is_portfolio_loaded(self) -> bool:
+        if not self.backend.portfolio.content:
+            msgbox.showerror(title="ERROR!", message='No portfolio loaded.')
+            return False
+        return True
+
+    def _set_entry_to_portfolio_name(self, entry: tk.Entry):
+        name = self.backend.portfolio.name or "Portfolio"
+        entry.delete(0, tk.END)
+        entry.insert(0, name)
+        entry.config(state='disabled')
+
+    def _open_find_asset1(self):
+        self._use_portfolio_for_asset1 = False
+        self.entry_asset1_ticker.config(state='normal')
+        FindAssetForCompareWindow(self.window, self.backend, self._prefill_asset1_ticker)
+
+    def _open_find_asset2(self):
+        self._use_portfolio_for_asset2 = False
+        self.entry_asset2_ticker.config(state='normal')
+        FindAssetForCompareWindow(self.window, self.backend, self._prefill_asset2_ticker)
+
+    def _prefill_asset1_ticker(self, ticker: str):
+        self.entry_asset1_ticker.delete(0, tk.END)
+        self.entry_asset1_ticker.insert(0, ticker)
+
+    def _prefill_asset2_ticker(self, ticker: str):
+        self.entry_asset2_ticker.delete(0, tk.END)
+        self.entry_asset2_ticker.insert(0, ticker)
+
     def _display_asset_names(self):
         self.lbl_asset1_name = tk.Label(self.window, text=self.backend.comparer.asset1_name)
-        self.lbl_asset1_name.grid(row = 3, column = 1, columnspan = 2)
+        self.lbl_asset1_name.grid(row = 4, column = 1, columnspan = 2)
         self.lbl_asset2_name = tk.Label(self.window, text=self.backend.comparer.asset2_name)
-        self.lbl_asset2_name.grid(row = 3, column = 3, columnspan = 2)
+        self.lbl_asset2_name.grid(row = 4, column = 2, columnspan = 2)
 
     def _plot_history_comparison(self):
         figure = pyplot.Figure(figsize=(10,4), dpi=self.chart_dpi)
@@ -75,7 +147,7 @@ class CompareWindow:
         else:
             df.plot(x='Date', y='asset1_price_index', kind='line', legend=True, ax=ax)
             df.plot(x='Date', y='asset2_price_index', kind='line', legend=True, ax=ax)
-        self.main_plot_canvas.get_tk_widget().grid(row = 4, column = 1, columnspan = 4)
+        self.main_plot_canvas.get_tk_widget().grid(row = 5, column = 1, columnspan = 4)
 
     def _plot_annualized_returns_asset1(self):
         figure = Figure(figsize=(5, 3), dpi=self.chart_dpi)
@@ -94,7 +166,7 @@ class CompareWindow:
             min_limit, max_limit = self._get_y_axes_limits(self.backend.comparer.asset1_annualized_returns, 
                                                            self.backend.comparer.asset2_annualized_returns)
             axes.set_ylim(min_limit, max_limit)
-        self.annualized_returns_plot_canvas_asset1.get_tk_widget().grid(row = 5, column = 1, columnspan = 2)
+        self.annualized_returns_plot_canvas_asset1.get_tk_widget().grid(row = 6, column = 1, columnspan = 2)
 
     def _plot_annualized_returns_asset2(self):
         figure = Figure(figsize=(5, 3), dpi=self.chart_dpi)
@@ -113,7 +185,47 @@ class CompareWindow:
             min_limit, max_limit = self._get_y_axes_limits(self.backend.comparer.asset1_annualized_returns, 
                                                            self.backend.comparer.asset2_annualized_returns)
             axes.set_ylim(min_limit, max_limit)
-        self.annualized_returns_plot_canvas_asset1.get_tk_widget().grid(row = 5, column = 3, columnspan = 2)
+        self.annualized_returns_plot_canvas_asset1.get_tk_widget().grid(row = 6, column = 3, columnspan = 2)
+
+    def _plot_volatility_asset1(self):
+        figure = Figure(figsize=(5, 3), dpi=self.chart_dpi)
+        self.volatility_canvas_asset1 = FigureCanvasTkAgg(figure, self.window)
+        axes = figure.add_subplot()
+        try:
+            periods = self.backend.comparer.asset1_volatility.keys()
+            values = self.backend.comparer.asset1_volatility.values()
+        except AttributeError:
+            pass
+        else:
+            bar = axes.bar(periods, values)
+            axes.set_title('Asset 1 Volatility')
+            axes.set_ylabel('%')
+            axes.bar_label(bar)
+            min_limit, max_limit = self._get_y_axes_limits(
+                self.backend.comparer.asset1_volatility,
+                self.backend.comparer.asset2_volatility)
+            axes.set_ylim(min_limit, max_limit)
+        self.volatility_canvas_asset1.get_tk_widget().grid(row=7, column=1, columnspan=2)
+
+    def _plot_volatility_asset2(self):
+        figure = Figure(figsize=(5, 3), dpi=self.chart_dpi)
+        self.volatility_canvas_asset2 = FigureCanvasTkAgg(figure, self.window)
+        axes = figure.add_subplot()
+        try:
+            periods = self.backend.comparer.asset2_volatility.keys()
+            values = self.backend.comparer.asset2_volatility.values()
+        except AttributeError:
+            pass
+        else:
+            bar = axes.bar(periods, values)
+            axes.set_title('Asset 2 Volatility')
+            axes.set_ylabel('%')
+            axes.bar_label(bar)
+            min_limit, max_limit = self._get_y_axes_limits(
+                self.backend.comparer.asset1_volatility,
+                self.backend.comparer.asset2_volatility)
+            axes.set_ylim(min_limit, max_limit)
+        self.volatility_canvas_asset2.get_tk_widget().grid(row=7, column=3, columnspan=2)
 
     def _get_y_axes_limits(self, asset1_data: dict, asset2_data: dict):
         asset1_values = list(asset1_data.values())

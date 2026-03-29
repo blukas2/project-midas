@@ -85,5 +85,5 @@ class Asset(Ticker):
         else:
             try:
                 return self.info['longName']
-            except (requests.exceptions.HTTPError, TypeError):
+            except (requests.exceptions.HTTPError, TypeError, KeyError):
                 return self.ticker

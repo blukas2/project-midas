@@ -3,6 +3,8 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from typing import Optional
 
+import pandas as pd
+
 from backend.globals.config import CURRENCY, ASSET_NAMES_FILE
 from backend.portfolio.components import Asset, CrossFx
 from backend.portfolio.reference_assets import ReferenceAssets
@@ -157,17 +159,21 @@ class Portfolio:
         return component_data
     
     def _calculate_correlation_matrix(self):
-        counter = 1
+        prices = self.build_combined_price_dataframe()
+        returns = prices.pct_change().dropna()
+        self.correlation_matrix = returns.corr()
+
+    def build_combined_price_dataframe(self) -> pd.DataFrame:
+        """Joins all asset price histories into a single DataFrame indexed by Date."""
+        combined = None
         for ticker, asset in self.content.items():
             df_temp = asset.price_history[['Date', 'Price']].copy(deep=True)
-            df_temp[ticker] = df_temp['Price']
-            df_temp = df_temp.drop(columns=['Price'])
-            if counter == 1:
-                df = df_temp
+            df_temp = df_temp.rename(columns={'Price': ticker})
+            if combined is None:
+                combined = df_temp
             else:
-                df = df.join(df_temp.set_index('Date'), on=['Date'], how='inner')
-            counter += 1
-        self.correlation_matrix = df.drop(columns=['Date']).corr()
+                combined = combined.join(df_temp.set_index('Date'), on='Date', how='inner')
+        return combined.drop(columns=['Date'])
 
     def _calculate_volatility(self):
         latest_date = self.history['Date'].max()
@@ -178,11 +184,8 @@ class Portfolio:
                 self.volatility[key] = self._calculate_volatility_for_a_given_period(reference_date)
 
     def _calculate_volatility_for_a_given_period(self, reference_date: date) -> float:
-        filtered_df = self.history[self.history['Date']>=reference_date].copy()
-        average_value = filtered_df['Value'].mean(skipna=True)
-        number_of_time_periods = filtered_df['Value'].count()
-        filtered_df['diff_squared_to_average'] = (filtered_df['Value']/average_value-1)**2
-        sum_of_diff_squared = filtered_df['diff_squared_to_average'].sum(skipna=True)
-        standard_deviation = (sum_of_diff_squared/number_of_time_periods)**(1/2)
-        volatility = standard_deviation*100
-        return volatility
+        filtered_df = self.history[self.history['Date']>=reference_date]
+        daily_returns = filtered_df['Value'].pct_change().dropna()
+        daily_std_dev = daily_returns.std(ddof=1)
+        annualized_volatility = daily_std_dev * (252 ** 0.5) * 100
+        return annualized_volatility

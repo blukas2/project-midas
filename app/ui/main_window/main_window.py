@@ -11,6 +11,7 @@ import pandas as pd
 from pandastable import Table, config
 
 from ui.main_window.popups import *
+from ui.main_window.analyze_portfolio import AnalyzePortfolioWindow
 from ui.compare.compare import CompareWindow
 from ui.assets.find_asset import FindAssetWindow
 
@@ -89,11 +90,13 @@ class MainWindowComponents:
     def _place_components(self):
         self.btn_change_position.grid(row = 1, column = 3, columnspan = 1)
         self.btn_recalculate_portfolio.grid(row = 1, column = 4, columnspan = 1)
+        self.btn_analyze_portfolio.grid(row = 1, column = 5, columnspan = 1)
         self.asset_table.grid(row = 2, column = 1, columnspan = 5)
 
     def _define_buttons(self):
         self.btn_change_position = tk.Button(self.window, text="Change Position", command=self.change_position)
         self.btn_recalculate_portfolio = tk.Button(self.window, text="Recalculate Portfolio", command=self.recalculate_portfolio)
+        self.btn_analyze_portfolio = tk.Button(self.window, text="Analyze Portfolio", command=self.analyze_portfolio)
 
     def display_portfolio_name(self):
         text = f"Portfolio name: {self.backend.portfolio.name}"
@@ -189,8 +192,12 @@ class MainWindowComponents:
         self.table = pt = Table(f, dataframe=df,
                                 showtoolbar=True, showstatusbar=True)
         options = {'colheadercolor':'green','floatprecision': 3}
+        pt.showindex = True
         config.apply_options(options, pt)
         pt.show()
+
+    def analyze_portfolio(self):
+        AnalyzePortfolioWindow(self.window, self.backend)
 
     def change_position(self):
         self.change_position_window = ChangePositionWindow(self.window, self, self.backend)

@@ -99,11 +99,8 @@ class ReturnsCalculator:
 
     def _calculate_volatility_for_a_given_period(self, reference_date: date) -> float:
         filtered_df = self.history[self.history['Date']>=reference_date]
-        average_value = filtered_df[self.source_column].mean(skipna=True)
-        number_of_time_periods = filtered_df[self.source_column].count()
-        filtered_df['diff_squared_to_average'] = (filtered_df[self.source_column]/average_value-1)**2
-        sum_of_diff_squared = filtered_df['diff_squared_to_average'].sum(skipna=True)
-        standard_deviation = (sum_of_diff_squared/number_of_time_periods)**(1/2)
-        volatility = standard_deviation
-        return volatility
+        daily_returns = filtered_df[self.source_column].pct_change().dropna()
+        daily_std_dev = daily_returns.std(ddof=1)
+        annualized_volatility = daily_std_dev * (252 ** 0.5) * 100
+        return annualized_volatility
     
