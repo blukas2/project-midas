@@ -51,6 +51,57 @@ class Portfolio:
         else:
             self.content[ticker].change_quantity(-quantity)
 
+    def change_position(self, ticker: str, quantity_change: int):
+        """Apply a position change: positive to add, negative to reduce."""
+        if quantity_change == 0:
+            raise ValueError("Quantity change cannot be zero.")
+        if quantity_change > 0:
+            self.add_asset(ticker, quantity_change)
+        else:
+            error = self.reduce_position(ticker, abs(quantity_change))
+            if error is not None:
+                raise ValueError(error)
+
+    def create_modified_copy(self, ticker: str, quantity_change: int) -> 'Portfolio':
+        """Create a copy of this portfolio with a position change applied."""
+        self._validate_position_change(ticker, quantity_change)
+        modified = self._create_empty_copy()
+        self._populate_modified_content(modified, ticker, quantity_change)
+        return modified
+
+    def _validate_position_change(self, ticker: str, quantity_change: int):
+        if quantity_change == 0:
+            raise ValueError("Quantity change cannot be zero.")
+        if quantity_change < 0 and ticker not in self.content:
+            raise ValueError(f"Product '{ticker}' not found in portfolio.")
+        if ticker in self.content and self.content[ticker].quantity + quantity_change < 0:
+            raise ValueError(f"Cannot reduce '{ticker}' below zero.")
+
+    def _create_empty_copy(self) -> 'Portfolio':
+        modified = object.__new__(Portfolio)
+        modified.name = self.name
+        modified.fx_rates = self.fx_rates
+        modified.asset_names_dict = self.asset_names_dict
+        modified.reference_assets = self.reference_assets
+        modified.content = {}
+        return modified
+
+    def _populate_modified_content(self, modified: 'Portfolio', ticker: str, quantity_change: int):
+        for t, asset in self.content.items():
+            if t == ticker:
+                new_quantity = asset.quantity + quantity_change
+                if new_quantity > 0:
+                    modified.content[t] = asset.copy_with_quantity(new_quantity)
+            else:
+                modified.content[t] = asset
+        if ticker not in self.content:
+            self._add_new_asset_to_copy(modified, ticker, quantity_change)
+
+    def _add_new_asset_to_copy(self, modified: 'Portfolio', ticker: str, quantity: int):
+        long_name = self.reference_assets.retrieve_long_name(ticker)
+        reference_asset = self.reference_assets.get_reference_asset(ticker)
+        modified.content[ticker] = Asset(ticker, quantity, long_name=long_name, reference_asset=reference_asset)
+
     def calculate(self):
         self._convert_asset_fx()
         self._calculate_history()

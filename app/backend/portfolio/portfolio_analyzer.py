@@ -27,6 +27,8 @@ TRADING_DAYS_PER_YEAR = 252
 class AnalysisResult:
     annualized_return_10y: float = 0.0
     annualized_return_10y_text: str = ""
+    annualized_return_5y: float = 0.0
+    annualized_return_5y_text: str = ""
     beta: float = 0.0
     beta_text: str = ""
     alpha: float = 0.0
@@ -133,18 +135,23 @@ class PortfolioAnalyzer:
             values[ticker] = last_row['Value']
         return values
 
-    # --- Annualized Return (10y) ---
+    # --- Annualized Return (10y & 5y) ---
 
     def _fill_annualized_return(self, result: AnalysisResult):
-        """Read the 10-year annualized return already computed by the portfolio."""
-        annualized = self.portfolio.annualized_returns.get('10y')
+        """Read the 10-year and 5-year annualized returns from the portfolio."""
+        self._fill_annualized_return_for_period(result, '10y')
+        self._fill_annualized_return_for_period(result, '5y')
+
+    def _fill_annualized_return_for_period(self, result: AnalysisResult, period: str):
+        annualized = self.portfolio.annualized_returns.get(period)
+        value_attr = f'annualized_return_{period}'
+        text_attr = f'annualized_return_{period}_text'
         if annualized is None:
-            result.annualized_return_10y_text = "Not enough history for a 10-year annualized return."
+            setattr(result, text_attr, f"Not enough history for a {period} annualized return.")
             return
-        result.annualized_return_10y = round(annualized, 2)
-        result.annualized_return_10y_text = self.interpreter.interpret_annualized_return(
-            result.annualized_return_10y
-        )
+        rounded = round(annualized, 2)
+        setattr(result, value_attr, rounded)
+        setattr(result, text_attr, self.interpreter.interpret_annualized_return(rounded))
 
     # --- Beta & Alpha ---
 

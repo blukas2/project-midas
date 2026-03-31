@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 
 import pandas as pd
@@ -78,6 +79,15 @@ class Asset(Ticker):
         if self.quantity + quantity_change < 0:
             raise ValueError("The quantity of an asset cannot be decreased by more than its current quantity")
         self.quantity = self.quantity + quantity_change
+
+    def copy_with_quantity(self, new_quantity: int) -> Asset:
+        """Create a lightweight copy with a different quantity, reusing price data."""
+        asset_copy = copy.copy(self)
+        asset_copy.quantity = new_quantity
+        asset_copy.price_history = self.price_history.copy()
+        asset_copy.price_history['Value'] = asset_copy.price_history['Price'] * new_quantity
+        asset_copy.price_history['Quantity'] = new_quantity
+        return asset_copy
 
     def get_longname(self):
         if self.long_name is not None:

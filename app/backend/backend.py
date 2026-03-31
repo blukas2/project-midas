@@ -24,6 +24,16 @@ class BackEnd:
         analyzer = PortfolioAnalyzer(self.portfolio)
         return analyzer.analyze()
 
+    def analyze_impact(self, ticker: str, quantity_change: int) -> tuple[AnalysisResult, AnalysisResult]:
+        """Analyze the impact of a position change on portfolio metrics."""
+        current_result = self.analyze_portfolio()
+        modified_portfolio = self.portfolio.create_modified_copy(ticker, quantity_change)
+        if not modified_portfolio.content:
+            raise ValueError("The proposed change would leave the portfolio empty.")
+        modified_portfolio.calculate()
+        projected_result = PortfolioAnalyzer(modified_portfolio).analyze()
+        return current_result, projected_result
+
 
 
 

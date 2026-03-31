@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox as msgbox
 
 from ui.assets.find_asset import FindAssetForPositionWindow
+from ui.main_window.analyze_impact import AnalyzeImpactWindow
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -28,9 +29,9 @@ class ChangePositionWindow:
         self.entry_quantity = tk.Entry(self.window, width = 10, borderwidth = 5)
         
         self.btn_find_asset = tk.Button(self.window, text="Find Asset", command=self._open_find_asset)
-        self.btn_add = tk.Button(self.window,text ="Add", command = self.add_asset)
-        self.btn_remove = tk.Button(self.window,text ="Reduce", command=self.reduce_position)
-        self.btn_cancel = tk.Button(self.window,text ="Cancel", command = self.close)
+        self.btn_change = tk.Button(self.window, text="Change", command=self.change_position)
+        self.btn_analyze_impact = tk.Button(self.window, text="Analyze Impact", command=self.analyze_impact)
+        self.btn_cancel = tk.Button(self.window, text="Cancel", command=self.close)
 
     def _place_components(self):
         self.lbl_ticker.grid(row = 1, column = 1, columnspan = 1)
@@ -39,8 +40,8 @@ class ChangePositionWindow:
         self.entry_quantity.grid(row = 1, column = 4, columnspan = 1)
 
         self.btn_find_asset.grid(row = 2, column = 1, columnspan = 1)
-        self.btn_add.grid(row = 2, column = 2, columnspan = 1)
-        self.btn_remove.grid(row = 2, column = 3, columnspan = 1)
+        self.btn_change.grid(row = 2, column = 2, columnspan = 1)
+        self.btn_analyze_impact.grid(row = 2, column = 3, columnspan = 1)
         self.btn_cancel.grid(row = 2, column = 4, columnspan = 1)
 
     def _open_find_asset(self):
@@ -50,36 +51,54 @@ class ChangePositionWindow:
         self.entry_ticker.delete(0, tk.END)
         self.entry_ticker.insert(0, ticker)
 
-    def add_asset(self):
+    def _validate_inputs(self):
+        ticker = self.entry_ticker.get().strip()
+        quantity_str = self.entry_quantity.get().strip()
+        if not ticker:
+            msgbox.showerror(title="ERROR!", message="Please enter a ticker.", parent=self.window)
+            return None, None
         try:
-            ticker = str(self.entry_ticker.get())
-            quantity = int(self.entry_quantity.get())
+            quantity = int(quantity_str)
         except (ValueError, AttributeError):
-            msgbox.showerror(title="ERROR!", message='Invalid ticker or quantity.')
-        else:
-            try:
-                self.backend.portfolio.add_asset(ticker, quantity)
-            except AttributeError:
-                msgbox.showerror(title="ERROR!", message=f'{ticker}: No data found, symbol may be delisted.')
-            else:
-                self.backend.portfolio.calculate()
-                self.subject.refresh_table()
-                self.window.destroy()
+            msgbox.showerror(title="ERROR!", message="Please enter a valid quantity.", parent=self.window)
+            return None, None
+        if quantity == 0:
+            msgbox.showerror(title="ERROR!", message="Quantity cannot be zero.", parent=self.window)
+            return None, None
+        return ticker, quantity
 
-    def reduce_position(self):
+    def change_position(self):
+        ticker, quantity = self._validate_inputs()
+        if ticker is None:
+            return
         try:
-            ticker = str(self.entry_ticker.get())
-            quantity = int(self.entry_quantity.get())
-        except (ValueError, AttributeError):
-            msgbox.showerror(title="ERROR!", message='Invalid ticker or quantity.')
+            self.backend.portfolio.change_position(ticker, quantity)
+        except AttributeError:
+            msgbox.showerror(title="ERROR!", message=f'{ticker}: No data found, symbol may be delisted.', parent=self.window)
+        except ValueError as e:
+            msgbox.showerror(title="ERROR!", message=str(e), parent=self.window)
         else:
-            response_message = self.backend.portfolio.reduce_position(ticker, quantity)
-            if response_message is not None:
-                msgbox.showerror(title="ERROR!", message=response_message)
-            else:
-                self.backend.portfolio.calculate()
-                self.subject.refresh_table()
-                self.window.destroy()
+            self.backend.portfolio.calculate()
+            self.subject.refresh_table()
+            self.window.destroy()
+
+    def analyze_impact(self):
+        ticker, quantity = self._validate_inputs()
+        if ticker is None:
+            return
+        if not self.backend.portfolio.content:
+            msgbox.showwarning("No Data", "Portfolio is empty. Add assets first.", parent=self.window)
+            return
+        try:
+            current, projected = self.backend.analyze_impact(ticker, quantity)
+        except AttributeError:
+            msgbox.showerror(title="ERROR!", message=f'{ticker}: No data found, symbol may be delisted.', parent=self.window)
+        except ValueError as e:
+            msgbox.showerror(title="ERROR!", message=str(e), parent=self.window)
+        except Exception as e:
+            msgbox.showerror(title="Analysis Error", message=str(e), parent=self.window)
+        else:
+            AnalyzeImpactWindow(self.window, current, projected, ticker, quantity)
 
     def close(self):
         self.window.destroy()
