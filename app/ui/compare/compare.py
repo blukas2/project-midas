@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox as msgbox
+from tkinter import ttk, messagebox as msgbox
 
 from matplotlib import pyplot
 from matplotlib.figure import Figure
@@ -21,6 +21,8 @@ class CompareWindow:
         self.chart_dpi = 80
         self._use_portfolio_for_asset1 = False
         self._use_portfolio_for_asset2 = False
+        self._show_in_eur = True
+        self._comparison_done = False
         self._define_components()
         self._place_components()
 
@@ -35,6 +37,12 @@ class CompareWindow:
         self.btn_portfolio_asset1 = tk.Button(self.window, text="Use Portfolio", command=self._use_portfolio_as_asset1)
         self.btn_portfolio_asset2 = tk.Button(self.window, text="Use Portfolio", command=self._use_portfolio_as_asset2)
         self.btn_compare = tk.Button(self.window,text ="Compare!", command = self.compare)
+        self._currency_var = tk.StringVar(value="EUR")
+        self.dropdown_currency = ttk.Combobox(
+            self.window, textvariable=self._currency_var,
+            values=["EUR", "Local"], state="readonly", width=12
+        )
+        self.dropdown_currency.bind("<<ComboboxSelected>>", self._on_currency_change)
 
     def _place_components(self):
         self.lbl_asset1_title.grid(row = 1, column = 1, columnspan = 1)
@@ -45,7 +53,8 @@ class CompareWindow:
         self.entry_asset2_ticker.grid(row = 2, column = 2, columnspan = 1)
         self.btn_find_asset2.grid(row = 2, column = 3, columnspan = 1)
         self.btn_portfolio_asset2.grid(row = 2, column = 4, columnspan = 1)
-        self.btn_compare.grid(row = 3, column = 1, columnspan = 4)
+        self.btn_compare.grid(row = 3, column = 1, columnspan = 2)
+        self.dropdown_currency.grid(row = 3, column = 3, columnspan = 2)
 
     def compare(self):
         try:
@@ -53,12 +62,25 @@ class CompareWindow:
         except AttributeError:
             msgbox.showerror(title="ERROR!", message='No data found, one of the symbols may be delisted.')
         else:
-            self._display_asset_names()
-            self._plot_history_comparison()
-            self._plot_annualized_returns_asset1()
-            self._plot_annualized_returns_asset2()
-            self._plot_volatility_asset1()
-            self._plot_volatility_asset2()
+            self._comparison_done = True
+            self._show_in_eur = True
+            self._currency_var.set("EUR")
+            self._display_charts()
+
+    def _on_currency_change(self, event=None):
+        if not self._comparison_done:
+            return
+        self._show_in_eur = self._currency_var.get() == "EUR"
+        self.backend.comparer.recalculate(self._show_in_eur)
+        self._display_charts()
+
+    def _display_charts(self):
+        self._display_asset_names()
+        self._plot_history_comparison()
+        self._plot_annualized_returns_asset1()
+        self._plot_annualized_returns_asset2()
+        self._plot_volatility_asset1()
+        self._plot_volatility_asset2()
 
     def _run_comparison(self):
         portfolio = self.backend.portfolio

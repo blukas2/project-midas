@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox as msgbox
+from tkinter import ttk, messagebox as msgbox
 
 import numpy as np
 from matplotlib.figure import Figure
@@ -24,7 +24,7 @@ class FindAssetWindow:
         self.search_results = []
         self._define_search_section()
         self._define_results_section()
-        self._define_currency_toggle()
+        self._define_currency_dropdown()
         self._define_chart_placeholders()
         self._place_components()
 
@@ -38,10 +38,13 @@ class FindAssetWindow:
         self.listbox_results = tk.Listbox(self.window, width=60, height=10)
         self.listbox_results.bind('<<ListboxSelect>>', self._on_select)
 
-    def _define_currency_toggle(self):
-        self.btn_currency = tk.Button(
-            self.window, text="Show in EUR", command=self._toggle_currency
+    def _define_currency_dropdown(self):
+        self._currency_var = tk.StringVar(value="Local")
+        self.dropdown_currency = ttk.Combobox(
+            self.window, textvariable=self._currency_var,
+            values=["Local", "EUR"], state="readonly", width=12
         )
+        self.dropdown_currency.bind("<<ComboboxSelected>>", self._on_currency_change)
 
     def _define_chart_placeholders(self):
         self.price_figure = Figure(figsize=(8, 4), dpi=self.chart_dpi)
@@ -55,7 +58,7 @@ class FindAssetWindow:
         self.btn_search.grid(row=1, column=4)
         self.lbl_results.grid(row=2, column=1, sticky='nw')
         self.listbox_results.grid(row=2, column=2, columnspan=3, pady=5)
-        self.btn_currency.grid(row=3, column=1, columnspan=2, pady=5)
+        self.dropdown_currency.grid(row=3, column=1, columnspan=2, pady=5)
         self.price_canvas.get_tk_widget().grid(row=4, column=1, columnspan=4)
         self.returns_canvas.get_tk_widget().grid(row=5, column=1, columnspan=4)
 
@@ -85,20 +88,18 @@ class FindAssetWindow:
         except Exception:
             msgbox.showerror(title="Error", message=f"Could not load '{selected.ticker}'.")
             return
-        self._update_currency_button_text()
+        self._update_currency_dropdown()
         self._refresh_charts()
 
-    def _toggle_currency(self):
-        self.show_in_eur = not self.show_in_eur
-        self._update_currency_button_text()
+    def _on_currency_change(self, event=None):
+        self.show_in_eur = self._currency_var.get() == "EUR"
         self._refresh_charts()
 
-    def _update_currency_button_text(self):
-        if self.show_in_eur:
-            label = self.backend.asset_analyzer.native_currency
-        else:
-            label = "EUR"
-        self.btn_currency.config(text=f"Show in {label}")
+    def _update_currency_dropdown(self):
+        native = self.backend.asset_analyzer.native_currency
+        current = "EUR" if self.show_in_eur else native
+        self.dropdown_currency.config(values=[native, "EUR"])
+        self._currency_var.set(current)
 
     def _refresh_charts(self):
         self._plot_price_history()
@@ -135,7 +136,7 @@ class FindAssetForPositionWindow(FindAssetWindow):
         self.selected_ticker: str | None = None
         super().__init__(master, backend)
         self.show_in_eur = True
-        self.btn_currency.config(text="Show in Original Currency")
+        self._currency_var.set("EUR")
 
     def _place_components(self):
         super()._place_components()

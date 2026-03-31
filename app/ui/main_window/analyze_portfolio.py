@@ -52,6 +52,9 @@ class AnalyzePortfolioWindow:
         self._add_metric_section(left_frame, "Information Ratio", result.information_ratio, result.information_ratio_text)
         self._add_metric_section(left_frame, "Sharpe Ratio", result.sharpe_ratio, result.sharpe_text)
         self._add_metric_section(left_frame, "Value at Risk (95%, Monthly)", f"{result.var_95}%", result.var_text)
+        self._add_metric_section(left_frame, "Conditional VaR (95%, Monthly)", f"{result.cvar_95}%", result.cvar_text)
+        self._add_metric_section(left_frame, "Maximum Drawdown", f"{result.max_drawdown}%", result.max_drawdown_text)
+        self._add_metric_section(left_frame, "Max Drawdown Duration", f"{result.max_drawdown_duration_days} days", result.max_drawdown_duration_text)
         self._add_metric_section(left_frame, "Diversification Ratio", result.diversification_ratio, result.diversification_text)
         self._add_metric_section(left_frame, "Effective Independent Bets", result.effective_bets, result.effective_bets_text)
         self._add_copy_button(left_frame)
@@ -88,19 +91,39 @@ class AnalyzePortfolioWindow:
         desc_label.pack(anchor="w", padx=25, pady=(0, 8))
 
     def _add_risk_contribution_table(self, parent: tk.Frame, result: AnalysisResult):
-        self._add_section_label(parent, "Risk Contribution Breakdown")
-        desc = tk.Label(parent, text=result.risk_contributions_text, wraplength=350, justify="left", fg="#555555")
-        desc.pack(anchor="w", padx=25, pady=(0, 5))
+        self._add_section_label(parent, "Risk & Return Contribution Breakdown")
+        desc = tk.Label(parent, text=result.risk_contributions_text, wraplength=450, justify="left", fg="#555555")
+        desc.pack(anchor="w", padx=25, pady=(0, 2))
+        desc2 = tk.Label(parent, text=result.return_contributions_text, wraplength=450, justify="left", fg="#555555")
+        desc2.pack(anchor="w", padx=25, pady=(0, 5))
 
-        tree = ttk.Treeview(parent, columns=("ticker", "contribution"), show="headings", height=min(len(result.risk_contributions), 12))
-        tree.heading("ticker", text="Ticker")
-        tree.heading("contribution", text="Risk Contribution %")
-        tree.column("ticker", width=200)
-        tree.column("contribution", width=200)
+        columns = ("ticker", "risk", "return")
+        tree = ttk.Treeview(parent, columns=columns, show="headings", height=min(len(result.risk_contributions), 12))
+        for col, label in [("ticker", "Ticker"), ("risk", "Risk Contribution %"), ("return", "Return Contribution %")]:
+            tree.heading(col, text=label, command=lambda c=col: self._sort_treeview(tree, c))
+        tree.column("ticker", width=150)
+        tree.column("risk", width=160)
+        tree.column("return", width=170)
 
-        for ticker, pct in sorted(result.risk_contributions.items(), key=lambda x: -x[1]):
-            tree.insert("", "end", values=(ticker, f"{pct:.1f}%"))
+        for ticker, risk_pct in sorted(result.risk_contributions.items(), key=lambda x: -x[1]):
+            ret_pct = result.return_contributions.get(ticker, 0.0)
+            tree.insert("", "end", values=(ticker, f"{risk_pct:.1f}%", f"{ret_pct:.2f}%"))
         tree.pack(padx=25, pady=(0, 15))
+        self._sort_ascending: dict[str, bool] = {}
+
+    def _sort_treeview(self, tree: ttk.Treeview, column: str):
+        """Sort treeview rows by the clicked column, toggling ascending/descending."""
+        ascending = not self._sort_ascending.get(column, False)
+        self._sort_ascending[column] = ascending
+
+        rows = [(tree.set(iid, column), iid) for iid in tree.get_children()]
+        if column != "ticker":
+            rows.sort(key=lambda r: float(r[0].strip('%')), reverse=not ascending)
+        else:
+            rows.sort(key=lambda r: r[0], reverse=not ascending)
+
+        for index, (_, iid) in enumerate(rows):
+            tree.move(iid, "", index)
 
     def _add_copy_button(self, parent: tk.Frame):
         btn = tk.Button(
