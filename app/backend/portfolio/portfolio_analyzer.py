@@ -24,10 +24,14 @@ TRADING_DAYS_PER_YEAR = 252
 
 @dataclass
 class AnalysisResult:
+    annualized_return_10y: float = 0.0
+    annualized_return_10y_text: str = ""
     beta: float = 0.0
     beta_text: str = ""
     alpha: float = 0.0
     alpha_text: str = ""
+    information_ratio: float = 0.0
+    information_ratio_text: str = ""
     sharpe_ratio: float = 0.0
     sharpe_text: str = ""
     var_95: float = 0.0
@@ -56,7 +60,9 @@ class PortfolioAnalyzer:
         weights, asset_returns = self._compute_weights_and_asset_returns()
 
         result = AnalysisResult(num_assets=len(self.portfolio.content))
+        self._fill_annualized_return(result)
         self._fill_beta_alpha(result, aligned)
+        self._fill_information_ratio(result, aligned)
         self._fill_sharpe(result, portfolio_returns)
         self._fill_var(result, portfolio_returns)
         self._fill_diversification(result, weights, asset_returns)
@@ -102,6 +108,19 @@ class PortfolioAnalyzer:
             values[ticker] = last_row['Value']
         return values
 
+    # --- Annualized Return (10y) ---
+
+    def _fill_annualized_return(self, result: AnalysisResult):
+        """Read the 10-year annualized return already computed by the portfolio."""
+        annualized = self.portfolio.annualized_returns.get('10y')
+        if annualized is None:
+            result.annualized_return_10y_text = "Not enough history for a 10-year annualized return."
+            return
+        result.annualized_return_10y = round(annualized, 2)
+        result.annualized_return_10y_text = self.interpreter.interpret_annualized_return(
+            result.annualized_return_10y
+        )
+
     # --- Beta & Alpha ---
 
     def _fill_beta_alpha(self, result: AnalysisResult, aligned: pd.DataFrame):
@@ -125,6 +144,16 @@ class PortfolioAnalyzer:
         cumulative = (1 + daily_returns).prod()
         n_days = len(daily_returns)
         return cumulative ** (TRADING_DAYS_PER_YEAR / n_days) - 1
+
+    # --- Information Ratio ---
+
+    def _fill_information_ratio(self, result: AnalysisResult, aligned: pd.DataFrame):
+        active_returns = aligned['portfolio'] - aligned['benchmark']
+        tracking_error = active_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
+        excess_return = self._annualize_return(aligned['portfolio']) - self._annualize_return(aligned['benchmark'])
+        ir = excess_return / tracking_error if tracking_error != 0 else 0
+        result.information_ratio = round(ir, 3)
+        result.information_ratio_text = self.interpreter.interpret_information_ratio(ir)
 
     # --- Sharpe Ratio ---
 
@@ -201,6 +230,16 @@ class PortfolioAnalyzer:
 class AnalysisInterpreter:
     """Converts raw metric values into human-readable descriptions."""
 
+    def interpret_annualized_return(self, annual_pct: float) -> str:
+        if annual_pct < 0:
+            return f"Annualized return of {annual_pct:.2f}%: the portfolio lost value."
+        elif annual_pct < 5:
+            return f"Annualized return of {annual_pct:.2f}%: modest growth."
+        elif annual_pct < 10:
+            return f"Annualized return of {annual_pct:.2f}%: solid growth."
+        else:
+            return f"Annualized return of {annual_pct:.2f}%: strong growth."
+
     def interpret_beta(self, beta: float) -> str:
         if beta < 0.8:
             return f"Beta of {beta:.2f}: your portfolio is defensive, moving less than the market."
@@ -216,6 +255,16 @@ class AnalysisInterpreter:
             return f"Alpha of {alpha:.2f}%: modest excess return above the CAPM expectation."
         else:
             return f"Alpha of {alpha:.2f}%: strong outperformance beyond market exposure."
+
+    def interpret_information_ratio(self, ir: float) -> str:
+        if ir < 0:
+            return f"IR of {ir:.2f}: negative excess return per unit of active risk."
+        elif ir < 0.4:
+            return f"IR of {ir:.2f}: low consistency of excess returns over the benchmark."
+        elif ir < 0.7:
+            return f"IR of {ir:.2f}: moderate, fairly consistent outperformance."
+        else:
+            return f"IR of {ir:.2f}: strong, consistent alpha generation."
 
     def interpret_sharpe(self, sharpe: float) -> str:
         if sharpe < 0:

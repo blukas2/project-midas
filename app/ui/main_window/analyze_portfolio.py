@@ -16,7 +16,7 @@ class AnalyzePortfolioWindow:
         self.backend = backend
         self.window = tk.Toplevel(master)
         self.window.title("Portfolio Analysis")
-        self.window.geometry("720x700")
+        self.window.geometry("1100x700")
         self._run_analysis()
 
     def _run_analysis(self):
@@ -33,15 +33,31 @@ class AnalyzePortfolioWindow:
         self._build_ui(result)
 
     def _build_ui(self, result: AnalysisResult):
+        self._metrics: list[tuple[str, str]] = []
         canvas, scrollable = self._create_scrollable_frame()
         self._add_header(scrollable, "Portfolio Analysis")
-        self._add_metric_section(scrollable, "Beta (to benchmark)", result.beta, result.beta_text)
-        self._add_metric_section(scrollable, "Alpha (Jensen's Alpha)", f"{result.alpha}%", result.alpha_text)
-        self._add_metric_section(scrollable, "Sharpe Ratio", result.sharpe_ratio, result.sharpe_text)
-        self._add_metric_section(scrollable, "Value at Risk (95%, Monthly)", f"{result.var_95}%", result.var_text)
-        self._add_metric_section(scrollable, "Diversification Ratio", result.diversification_ratio, result.diversification_text)
-        self._add_metric_section(scrollable, "Effective Independent Bets", result.effective_bets, result.effective_bets_text)
-        self._add_risk_contribution_table(scrollable, result)
+
+        columns_frame = tk.Frame(scrollable)
+        columns_frame.pack(fill="both", expand=True, padx=5)
+
+        left_frame = tk.Frame(columns_frame)
+        left_frame.pack(side="left", fill="both", expand=True)
+
+        right_frame = tk.Frame(columns_frame)
+        right_frame.pack(side="left", fill="both", padx=(20, 0))
+
+        self._add_metric_section(left_frame, "Annualized Return (10y)", f"{result.annualized_return_10y}%", result.annualized_return_10y_text)
+        self._add_metric_section(left_frame, "Beta (to benchmark)", result.beta, result.beta_text)
+        self._add_metric_section(left_frame, "Alpha (Jensen's Alpha)", f"{result.alpha}%", result.alpha_text)
+        self._add_metric_section(left_frame, "Information Ratio", result.information_ratio, result.information_ratio_text)
+        self._add_metric_section(left_frame, "Sharpe Ratio", result.sharpe_ratio, result.sharpe_text)
+        self._add_metric_section(left_frame, "Value at Risk (95%, Monthly)", f"{result.var_95}%", result.var_text)
+        self._add_metric_section(left_frame, "Diversification Ratio", result.diversification_ratio, result.diversification_text)
+        self._add_metric_section(left_frame, "Effective Independent Bets", result.effective_bets, result.effective_bets_text)
+        self._add_copy_button(left_frame)
+
+        self._add_risk_contribution_table(right_frame, result)
+
         scrollable.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
 
@@ -63,16 +79,17 @@ class AnalyzePortfolioWindow:
         separator.pack(fill="x", padx=15, pady=(0, 10))
 
     def _add_metric_section(self, parent: tk.Frame, name: str, value, description: str):
+        self._metrics.append((name, str(value)))
         frame = tk.Frame(parent)
         frame.pack(fill="x", padx=15, pady=(5, 0))
         tk.Label(frame, text=f"{name}:  ", font=("Arial", 11, "bold")).pack(side="left")
         tk.Label(frame, text=str(value), font=("Arial", 11)).pack(side="left")
-        desc_label = tk.Label(parent, text=description, wraplength=650, justify="left", fg="#555555")
+        desc_label = tk.Label(parent, text=description, wraplength=450, justify="left", fg="#555555")
         desc_label.pack(anchor="w", padx=25, pady=(0, 8))
 
     def _add_risk_contribution_table(self, parent: tk.Frame, result: AnalysisResult):
         self._add_section_label(parent, "Risk Contribution Breakdown")
-        desc = tk.Label(parent, text=result.risk_contributions_text, wraplength=650, justify="left", fg="#555555")
+        desc = tk.Label(parent, text=result.risk_contributions_text, wraplength=350, justify="left", fg="#555555")
         desc.pack(anchor="w", padx=25, pady=(0, 5))
 
         tree = ttk.Treeview(parent, columns=("ticker", "contribution"), show="headings", height=min(len(result.risk_contributions), 12))
@@ -84,6 +101,19 @@ class AnalyzePortfolioWindow:
         for ticker, pct in sorted(result.risk_contributions.items(), key=lambda x: -x[1]):
             tree.insert("", "end", values=(ticker, f"{pct:.1f}%"))
         tree.pack(padx=25, pady=(0, 15))
+
+    def _add_copy_button(self, parent: tk.Frame):
+        btn = tk.Button(
+            parent, text="Copy to Clipboard",
+            command=self._copy_metrics_to_clipboard
+        )
+        btn.pack(anchor="w", padx=15, pady=(10, 10))
+
+    def _copy_metrics_to_clipboard(self):
+        lines = [f"{name}: {value}" for name, value in self._metrics]
+        text = "\n".join(lines)
+        self.window.clipboard_clear()
+        self.window.clipboard_append(text)
 
     def _add_section_label(self, parent: tk.Frame, text: str):
         separator = ttk.Separator(parent, orient="horizontal")
