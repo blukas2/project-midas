@@ -45,6 +45,7 @@ class FindAssetWindow:
             values=["Local", "EUR"], state="readonly", width=12
         )
         self.dropdown_currency.bind("<<ComboboxSelected>>", self._on_currency_change)
+        self.lbl_last_price = tk.Label(self.window, text="", anchor="w")
 
     def _define_chart_placeholders(self):
         self.price_figure = Figure(figsize=(8, 4), dpi=self.chart_dpi)
@@ -59,6 +60,7 @@ class FindAssetWindow:
         self.lbl_results.grid(row=2, column=1, sticky='nw')
         self.listbox_results.grid(row=2, column=2, columnspan=3, pady=5)
         self.dropdown_currency.grid(row=3, column=1, columnspan=2, pady=5)
+        self.lbl_last_price.grid(row=3, column=3, columnspan=2, pady=5, sticky='w')
         self.price_canvas.get_tk_widget().grid(row=4, column=1, columnspan=4)
         self.returns_canvas.get_tk_widget().grid(row=5, column=1, columnspan=4)
 
@@ -102,8 +104,18 @@ class FindAssetWindow:
         self._currency_var.set(current)
 
     def _refresh_charts(self):
+        self._update_last_price_label()
         self._plot_price_history()
         self._plot_annualized_returns()
+
+    def _update_last_price_label(self):
+        analyzer = self.backend.asset_analyzer
+        price = analyzer.get_last_closing_price(self.show_in_eur)
+        if price is None:
+            self.lbl_last_price.config(text="")
+            return
+        currency = analyzer.get_currency_label(self.show_in_eur)
+        self.lbl_last_price.config(text=f"Last Close: {price:.2f} {currency}")
 
     def _plot_price_history(self):
         self.price_figure.clear()

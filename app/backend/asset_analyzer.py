@@ -67,6 +67,15 @@ class AssetAnalyzer:
         portfolio_hist['Portfolio'] = portfolio_hist['Value'] / base_value * 100
         return portfolio_hist[['Date', 'Portfolio']]
 
+    def get_last_closing_price(self, in_eur: bool) -> float | None:
+        """Return the most recent closing price in the selected currency."""
+        if self.asset is None:
+            return None
+        history = self._get_history_table(in_eur)
+        if history.empty:
+            return None
+        return float(history['Price'].iloc[-1])
+
     def get_currency_label(self, in_eur: bool) -> str:
         """Return the currency label for chart display."""
         if in_eur:
