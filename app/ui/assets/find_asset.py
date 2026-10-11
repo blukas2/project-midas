@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk, messagebox as msgbox
+import customtkinter as ctk
 
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from ui.dialogs import ThemedMessageBox as msgbox
+from ui.theme import style_chart
 
 from typing import Callable, TYPE_CHECKING
 if TYPE_CHECKING:
@@ -17,11 +19,14 @@ class FindAssetWindow:
 
     def __init__(self, master, backend: BackEnd):
         self.backend = backend
-        self.window = tk.Toplevel(master)
+        self.window = ctk.CTkToplevel(master)
         self.window.title("Find Asset")
+        self.window.geometry("1000x900")
         self.chart_dpi = 80
         self.show_in_eur = False
         self.search_results = []
+        self._selected_result_index: int | None = None
+        self._result_buttons = []
         self._define_search_section()
         self._define_results_section()
         self._define_currency_dropdown()
@@ -29,23 +34,25 @@ class FindAssetWindow:
         self._place_components()
 
     def _define_search_section(self):
-        self.lbl_search = tk.Label(self.window, text="Search:")
-        self.entry_search = tk.Entry(self.window, width=30, borderwidth=5)
-        self.btn_search = tk.Button(self.window, text="Search", command=self._on_search)
+        self.lbl_search = ctk.CTkLabel(self.window, text="Search:")
+        self.entry_search = ctk.CTkEntry(self.window, width=320)
+        self.btn_search = ctk.CTkButton(self.window, text="Search", command=self._on_search)
 
     def _define_results_section(self):
-        self.lbl_results = tk.Label(self.window, text="Results:")
-        self.listbox_results = tk.Listbox(self.window, width=60, height=10)
-        self.listbox_results.bind('<<ListboxSelect>>', self._on_select)
+        self.lbl_results = ctk.CTkLabel(self.window, text="Results:")
+        self.listbox_results = ctk.CTkScrollableFrame(self.window, width=520, height=180)
 
     def _define_currency_dropdown(self):
         self._currency_var = tk.StringVar(value="Local")
-        self.dropdown_currency = ttk.Combobox(
-            self.window, textvariable=self._currency_var,
-            values=["Local", "EUR"], state="readonly", width=12
+        self.dropdown_currency = ctk.CTkComboBox(
+            self.window,
+            variable=self._currency_var,
+            values=["Local", "EUR"],
+            state="readonly",
+            width=160,
+            command=self._on_currency_change,
         )
-        self.dropdown_currency.bind("<<ComboboxSelected>>", self._on_currency_change)
-        self.lbl_last_price = tk.Label(self.window, text="", anchor="w")
+        self.lbl_last_price = ctk.CTkLabel(self.window, text="", anchor="w")
 
     def _define_chart_placeholders(self):
         self.price_figure = Figure(figsize=(8, 4), dpi=self.chart_dpi)
@@ -58,7 +65,7 @@ class FindAssetWindow:
         self.entry_search.grid(row=1, column=2, columnspan=2)
         self.btn_search.grid(row=1, column=4)
         self.lbl_results.grid(row=2, column=1, sticky='nw')
-        self.listbox_results.grid(row=2, column=2, columnspan=3, pady=5)
+        self.listbox_results.grid(row=2, column=2, columnspan=3, pady=5, sticky="ew")
         self.dropdown_currency.grid(row=3, column=1, columnspan=2, pady=5)
         self.lbl_last_price.grid(row=3, column=3, columnspan=2, pady=5, sticky='w')
         self.price_canvas.get_tk_widget().grid(row=4, column=1, columnspan=4)
@@ -71,24 +78,39 @@ class FindAssetWindow:
         try:
             self.search_results = self.backend.asset_analyzer.search(query)
         except Exception:
-            msgbox.showerror(title="Error", message="Search failed. Please try again.")
+            msgbox.showerror(title="Error", message="Search failed. Please try again.", parent=self.window)
             return
         self._populate_results()
 
     def _populate_results(self):
-        self.listbox_results.delete(0, tk.END)
-        for result in self.search_results:
-            self.listbox_results.insert(tk.END, str(result))
+        for button in self._result_buttons:
+            button.destroy()
+        self._result_buttons.clear()
+        self._selected_result_index = None
+        for index, result in enumerate(self.search_results):
+            button = ctk.CTkButton(
+                self.listbox_results,
+                text=str(result),
+                anchor="w",
+                command=lambda selected=index: self._on_select(index=selected),
+            )
+            button.pack(fill="x", padx=4, pady=2)
+            self._result_buttons.append(button)
 
-    def _on_select(self, event):
-        selection = self.listbox_results.curselection()
-        if not selection:
+    def _on_select(self, event=None, index: int | None = None):
+        if index is not None:
+            self._selected_result_index = index
+        if self._selected_result_index is None:
             return
-        selected = self.search_results[selection[0]]
+        selected = self.search_results[self._selected_result_index]
         try:
             self.backend.asset_analyzer.load_asset(selected.ticker)
         except Exception:
-            msgbox.showerror(title="Error", message=f"Could not load '{selected.ticker}'.")
+            msgbox.showerror(
+                title="Error",
+                message=f"Could not load '{selected.ticker}'.",
+                parent=self.window,
+            )
             return
         self._update_currency_dropdown()
         self._refresh_charts()
@@ -100,7 +122,7 @@ class FindAssetWindow:
     def _update_currency_dropdown(self):
         native = self.backend.asset_analyzer.native_currency
         current = "EUR" if self.show_in_eur else native
-        self.dropdown_currency.config(values=[native, "EUR"])
+        self.dropdown_currency.configure(values=[native, "EUR"])
         self._currency_var.set(current)
 
     def _refresh_charts(self):
@@ -112,10 +134,10 @@ class FindAssetWindow:
         analyzer = self.backend.asset_analyzer
         price = analyzer.get_last_closing_price(self.show_in_eur)
         if price is None:
-            self.lbl_last_price.config(text="")
+            self.lbl_last_price.configure(text="")
             return
         currency = analyzer.get_currency_label(self.show_in_eur)
-        self.lbl_last_price.config(text=f"Last Close: {price:.2f} {currency}")
+        self.lbl_last_price.configure(text=f"Last Close: {price:.2f} {currency}")
 
     def _plot_price_history(self):
         self.price_figure.clear()
@@ -125,6 +147,7 @@ class FindAssetWindow:
         df.plot(x='Date', y='Price', kind='line', legend=True, ax=ax)
         ax.set_title(f"Price History ({currency})")
         ax.set_ylabel(currency)
+        style_chart(self.price_figure)
         self.price_canvas.draw()
 
     def _plot_annualized_returns(self):
@@ -137,6 +160,7 @@ class FindAssetWindow:
         currency = self.backend.asset_analyzer.get_currency_label(self.show_in_eur)
         ax.set_title(f"Annualized Returns ({currency})")
         ax.set_ylabel('%')
+        style_chart(self.returns_figure)
         self.returns_canvas.draw()
 
 
@@ -152,17 +176,18 @@ class FindAssetForPositionWindow(FindAssetWindow):
 
     def _place_components(self):
         super()._place_components()
-        self.btn_select = tk.Button(self.window, text="Select Asset", command=self._select_asset)
-        self.btn_cancel = tk.Button(self.window, text="Cancel", command=self._cancel)
+        self.btn_select = ctk.CTkButton(self.window, text="Select Asset", command=self._select_asset)
+        self.btn_cancel = ctk.CTkButton(self.window, text="Cancel", command=self._cancel)
         self.btn_select.grid(row=6, column=2, pady=5)
         self.btn_cancel.grid(row=6, column=3, pady=5)
 
-    def _on_select(self, event):
-        selection = self.listbox_results.curselection()
-        if not selection:
+    def _on_select(self, event=None, index: int | None = None):
+        if index is not None:
+            self._selected_result_index = index
+        if self._selected_result_index is None:
             return
-        self.selected_ticker = self.search_results[selection[0]].ticker
-        super()._on_select(event)
+        self.selected_ticker = self.search_results[self._selected_result_index].ticker
+        super()._on_select(event, self._selected_result_index)
 
     def _plot_price_history(self):
         self.price_figure.clear()
@@ -175,6 +200,7 @@ class FindAssetForPositionWindow(FindAssetWindow):
             df = analyzer.get_price_history(self.show_in_eur)
             df.plot(x='Date', y='Price', kind='line', legend=True, ax=ax)
         ax.set_title(f"Price History ({currency})")
+        style_chart(self.price_figure)
         self.price_canvas.draw()
 
     def _plot_indexed_price_history(self, ax):
@@ -204,6 +230,7 @@ class FindAssetForPositionWindow(FindAssetWindow):
                 ax.bar_label(bar)
         ax.set_title(f"Annualized Returns ({currency})")
         ax.set_ylabel('%')
+        style_chart(self.returns_figure)
         self.returns_canvas.draw()
 
     def _plot_grouped_annualized_returns(self, ax, asset_returns: dict):
@@ -246,8 +273,8 @@ class FindAssetForCompareWindow(FindAssetWindow):
 
     def _place_components(self):
         super()._place_components()
-        self.btn_select = tk.Button(self.window, text="Select Asset", command=self._select_asset)
-        self.btn_cancel = tk.Button(self.window, text="Cancel", command=self._cancel)
+        self.btn_select = ctk.CTkButton(self.window, text="Select Asset", command=self._select_asset)
+        self.btn_cancel = ctk.CTkButton(self.window, text="Cancel", command=self._cancel)
         self.btn_select.grid(row=6, column=2, pady=5)
         self.btn_cancel.grid(row=6, column=3, pady=5)
 

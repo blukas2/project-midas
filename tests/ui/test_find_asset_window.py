@@ -15,10 +15,11 @@ class TestFindAssetWindow:
     def test_constructor_builds_controls_and_chart_placeholders(self, monkeypatch):
         popup = Mock()
         figure = Mock()
-        monkeypatch.setattr("ui.assets.find_asset.tk.Toplevel", Mock(return_value=popup))
-        for name in ("Label", "Entry", "Button", "Listbox", "StringVar"):
-            monkeypatch.setattr("ui.assets.find_asset.tk." + name, Mock())
-        monkeypatch.setattr("ui.assets.find_asset.ttk.Combobox", Mock())
+        monkeypatch.setattr("ui.assets.find_asset.ctk.CTkToplevel", Mock(return_value=popup))
+        for name in ("CTkLabel", "CTkEntry", "CTkButton", "CTkScrollableFrame"):
+            monkeypatch.setattr("ui.assets.find_asset.ctk." + name, Mock())
+        monkeypatch.setattr("ui.assets.find_asset.tk.StringVar", Mock())
+        monkeypatch.setattr("ui.assets.find_asset.ctk.CTkComboBox", Mock())
         monkeypatch.setattr("ui.assets.find_asset.Figure", Mock(return_value=figure))
         monkeypatch.setattr("ui.assets.find_asset.FigureCanvasTkAgg", Mock())
 
@@ -31,10 +32,11 @@ class TestFindAssetWindow:
 
     def test_position_picker_defaults_to_eur_and_exposes_select_buttons(self, monkeypatch):
         popup = Mock()
-        monkeypatch.setattr("ui.assets.find_asset.tk.Toplevel", Mock(return_value=popup))
-        for name in ("Label", "Entry", "Button", "Listbox", "StringVar"):
-            monkeypatch.setattr("ui.assets.find_asset.tk." + name, Mock())
-        monkeypatch.setattr("ui.assets.find_asset.ttk.Combobox", Mock())
+        monkeypatch.setattr("ui.assets.find_asset.ctk.CTkToplevel", Mock(return_value=popup))
+        for name in ("CTkLabel", "CTkEntry", "CTkButton", "CTkScrollableFrame"):
+            monkeypatch.setattr("ui.assets.find_asset.ctk." + name, Mock())
+        monkeypatch.setattr("ui.assets.find_asset.tk.StringVar", Mock())
+        monkeypatch.setattr("ui.assets.find_asset.ctk.CTkComboBox", Mock())
         monkeypatch.setattr("ui.assets.find_asset.Figure", Mock(return_value=Mock()))
         monkeypatch.setattr("ui.assets.find_asset.FigureCanvasTkAgg", Mock())
         callback = Mock()
@@ -46,19 +48,33 @@ class TestFindAssetWindow:
         window._currency_var.set.assert_called_with("EUR")
 
     def test_search_trims_query_and_populates_results(self):
+        populate = Mock()
         window = FindAssetWindow.__new__(FindAssetWindow)
         window.entry_search = SimpleNamespace(get=lambda: " ABC ")
         window.backend = SimpleNamespace(
             asset_analyzer=SimpleNamespace(search=lambda query: [query])
         )
-        window.listbox_results = Mock()
         window.search_results = []
+        window._populate_results = populate
 
         window._on_search()
 
         assert window.search_results == ["ABC"]
-        window.listbox_results.delete.assert_called_once()
-        window.listbox_results.insert.assert_called_once()
+        populate.assert_called_once_with()
+
+    def test_populate_results_replaces_result_buttons(self, monkeypatch):
+        window = FindAssetWindow.__new__(FindAssetWindow)
+        window.listbox_results = Mock()
+        window.search_results = ["ABC", "XYZ"]
+        window._result_buttons = [Mock()]
+        button_factory = Mock()
+        monkeypatch.setattr("ui.assets.find_asset.ctk.CTkButton", button_factory)
+
+        window._populate_results()
+
+        assert len(window._result_buttons) == 2
+        assert button_factory.call_count == 2
+        window.listbox_results.winfo_children.assert_not_called()
 
     def test_empty_search_does_not_query_backend(self):
         search = Mock()
@@ -72,6 +88,7 @@ class TestFindAssetWindow:
 
     def test_search_failure_shows_error(self, monkeypatch):
         window = FindAssetWindow.__new__(FindAssetWindow)
+        window.window = Mock()
         window.entry_search = SimpleNamespace(get=lambda: "ABC")
         window.backend = SimpleNamespace(
             asset_analyzer=SimpleNamespace(search=Mock(side_effect=RuntimeError("offline")))
@@ -85,14 +102,15 @@ class TestFindAssetWindow:
 
     def test_selection_loads_ticker_and_refreshes_display(self):
         window = FindAssetWindow.__new__(FindAssetWindow)
-        window.listbox_results = SimpleNamespace(curselection=lambda: [0])
+        window.window = Mock()
+        window._selected_result_index = 0
         window.search_results = [SimpleNamespace(ticker="ABC")]
         analyzer = SimpleNamespace(load_asset=Mock())
         window.backend = SimpleNamespace(asset_analyzer=analyzer)
         window._update_currency_dropdown = Mock()
         window._refresh_charts = Mock()
 
-        window._on_select(None)
+        window._on_select()
 
         analyzer.load_asset.assert_called_once_with("ABC")
         window._update_currency_dropdown.assert_called_once_with()
@@ -101,16 +119,17 @@ class TestFindAssetWindow:
     def test_selection_without_row_is_ignored(self):
         analyzer = Mock()
         window = FindAssetWindow.__new__(FindAssetWindow)
-        window.listbox_results = SimpleNamespace(curselection=lambda: [])
+        window._selected_result_index = None
         window.backend = SimpleNamespace(asset_analyzer=analyzer)
 
-        window._on_select(None)
+        window._on_select()
 
         analyzer.load_asset.assert_not_called()
 
     def test_selection_error_reports_ticker(self, monkeypatch):
         window = FindAssetWindow.__new__(FindAssetWindow)
-        window.listbox_results = SimpleNamespace(curselection=lambda: [0])
+        window.window = Mock()
+        window._selected_result_index = 0
         window.search_results = [SimpleNamespace(ticker="BAD")]
         window.backend = SimpleNamespace(
             asset_analyzer=SimpleNamespace(load_asset=Mock(side_effect=ValueError("invalid")))
@@ -118,7 +137,7 @@ class TestFindAssetWindow:
         error = Mock()
         monkeypatch.setattr("ui.assets.find_asset.msgbox.showerror", error)
 
-        window._on_select(None)
+        window._on_select()
 
         assert "BAD" in error.call_args.kwargs["message"]
 
@@ -143,7 +162,7 @@ class TestFindAssetWindow:
 
         window._update_currency_dropdown()
 
-        window.dropdown_currency.config.assert_called_once_with(values=["USD", "EUR"])
+        window.dropdown_currency.configure.assert_called_once_with(values=["USD", "EUR"])
         window._currency_var.set.assert_called_once_with("EUR")
 
     def test_last_price_label_handles_available_and_missing_prices(self):
@@ -159,10 +178,10 @@ class TestFindAssetWindow:
 
         window._update_last_price_label()
 
-        window.lbl_last_price.config.assert_called_once_with(text="Last Close: 23.50 EUR")
+        window.lbl_last_price.configure.assert_called_once_with(text="Last Close: 23.50 EUR")
         window.backend.asset_analyzer.get_last_closing_price = lambda eur: None
         window._update_last_price_label()
-        window.lbl_last_price.config.assert_called_with(text="")
+        window.lbl_last_price.configure.assert_called_with(text="")
 
     def test_position_picker_select_callback_and_close(self):
         window = FindAssetForPositionWindow.__new__(FindAssetForPositionWindow)
@@ -197,6 +216,7 @@ class TestFindAssetWindow:
             get_annualized_returns=lambda eur: {},
         )
         window = FindAssetWindow.__new__(FindAssetWindow)
+        window.window = Mock()
         window.backend = SimpleNamespace(asset_analyzer=analyzer)
         window.show_in_eur = False
         window.lbl_last_price = Mock()
@@ -207,12 +227,13 @@ class TestFindAssetWindow:
         window.price_figure.add_subplot.return_value = Mock()
         window.returns_figure.add_subplot.return_value = Mock()
 
+        monkeypatch.setattr("ui.assets.find_asset.style_chart", Mock())
         window._refresh_charts()
 
         history.plot.assert_called_once()
         window.price_canvas.draw.assert_called_once()
         window.returns_canvas.draw.assert_called_once()
-        window.lbl_last_price.config.assert_called_once_with(text="Last Close: 12.00 USD")
+        window.lbl_last_price.configure.assert_called_once_with(text="Last Close: 12.00 USD")
 
     def test_position_picker_plots_eur_asset_against_portfolio(self, monkeypatch):
         dates = pd.to_datetime(["2024-01-01", "2024-01-02"])

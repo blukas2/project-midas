@@ -9,6 +9,7 @@ Project Midas is a Python desktop application for exploring investment portfolio
 - Analyze risk and performance, including Sharpe ratio, drawdown, beta, alpha, value at risk, and diversification measures.
 - Search for assets and compare assets side by side.
 - View asset and portfolio history in EUR.
+- Follow the operating system appearance by default, with a light/dark theme toggle and themed dialogs.
 
 Market data availability and accuracy depend on Yahoo Finance and your internet connection. This application is for informational purposes only; it is not financial advice.
 
@@ -16,6 +17,7 @@ Market data availability and accuracy depend on Yahoo Finance and your internet 
 
 - Python 3.10 or newer.
 - A working Tkinter installation.
+- CustomTkinter (installed with the project dependencies).
 - Internet access for market data and asset search.
 
 ## Setup
@@ -53,7 +55,7 @@ From the repository root:
 python app\app.py
 ```
 
-The app opens a desktop window. Use **Portfolio > New** to create a portfolio, **Assets > Find Asset...** to search for a ticker, and the portfolio controls to add positions and recalculate. Use **Portfolio > Save** to save a custom portfolio. **Portfolio > Open** lists portfolios found in the configured data directory; **Analysis > Compare** opens asset comparison.
+The app opens a desktop window with **Portfolio**, **Assets**, and **Analysis** dropdowns in the top bar. Use **Portfolio > New** to create a portfolio, **Assets > Find Asset...** to search for a ticker, and the portfolio controls to add positions and recalculate. Use **Portfolio > Save** to save a custom portfolio. **Portfolio > Open** lists portfolios found in the configured data directory; **Analysis > Compare** opens asset comparison. Use **Theme** in the top bar to switch between light and dark appearance.
 
 Market data requests require an internet connection and may take time or fail when the data provider is unavailable.
 
@@ -71,7 +73,7 @@ python -m pytest
 app/
   app.py                 Application entry point
   backend/               Portfolio data, market-data, and analysis logic
-  ui/                    Tkinter windows and charts
+  ui/                    CustomTkinter windows, themed dialogs, and charts
 tests/                   Backend, UI, and application tests
 research/                Project analysis notes
 requirements.txt         Python dependencies

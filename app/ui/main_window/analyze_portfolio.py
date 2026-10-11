@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import tkinter as tk
-from tkinter import ttk, messagebox as msgbox
+import customtkinter as ctk
+from tkinter import ttk
 
 from typing import TYPE_CHECKING
+from ui.dialogs import ThemedMessageBox as msgbox
 if TYPE_CHECKING:
     from backend.backend import BackEnd
     from backend.portfolio.portfolio_analyzer import AnalysisResult
@@ -14,7 +15,7 @@ class AnalyzePortfolioWindow:
 
     def __init__(self, master, backend: BackEnd):
         self.backend = backend
-        self.window = tk.Toplevel(master)
+        self.window = ctk.CTkToplevel(master)
         self.window.title("Portfolio Analysis")
         self.window.geometry("1100x700")
         self._run_analysis()
@@ -34,16 +35,16 @@ class AnalyzePortfolioWindow:
 
     def _build_ui(self, result: AnalysisResult):
         self._metrics: list[tuple[str, str]] = []
-        canvas, scrollable = self._create_scrollable_frame()
+        scrollable = self._create_scrollable_frame()
         self._add_header(scrollable, "Portfolio Analysis")
 
-        columns_frame = tk.Frame(scrollable)
+        columns_frame = ctk.CTkFrame(scrollable)
         columns_frame.pack(fill="both", expand=True, padx=5)
 
-        left_frame = tk.Frame(columns_frame)
+        left_frame = ctk.CTkFrame(columns_frame)
         left_frame.pack(side="left", fill="both", expand=True)
 
-        right_frame = tk.Frame(columns_frame)
+        right_frame = ctk.CTkFrame(columns_frame)
         right_frame.pack(side="left", fill="both", padx=(20, 0))
 
         self._add_metric_section(left_frame, "Annualized Return (10y)", f"{result.annualized_return_10y}%", result.annualized_return_10y_text)
@@ -61,40 +62,30 @@ class AnalyzePortfolioWindow:
 
         self._add_risk_contribution_table(right_frame, result)
 
-        scrollable.update_idletasks()
-        canvas.configure(scrollregion=canvas.bbox("all"))
+    def _create_scrollable_frame(self) -> ctk.CTkScrollableFrame:
+        scrollable = ctk.CTkScrollableFrame(self.window)
+        scrollable.pack(fill="both", expand=True)
+        return scrollable
 
-    def _create_scrollable_frame(self) -> tuple[tk.Canvas, tk.Frame]:
-        canvas = tk.Canvas(self.window)
-        scrollbar = ttk.Scrollbar(self.window, orient="vertical", command=canvas.yview)
-        scrollable = tk.Frame(canvas)
-        scrollable.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=scrollable, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        return canvas, scrollable
-
-    def _add_header(self, parent: tk.Frame, text: str):
-        label = tk.Label(parent, text=text, font=("Arial", 16, "bold"))
+    def _add_header(self, parent: ctk.CTkFrame, text: str):
+        label = ctk.CTkLabel(parent, text=text, font=("Arial", 16, "bold"))
         label.pack(anchor="w", padx=15, pady=(15, 5))
-        separator = ttk.Separator(parent, orient="horizontal")
-        separator.pack(fill="x", padx=15, pady=(0, 10))
+        ctk.CTkFrame(parent, height=2, fg_color=("gray75", "gray30")).pack(fill="x", padx=15, pady=(0, 10))
 
-    def _add_metric_section(self, parent: tk.Frame, name: str, value, description: str):
+    def _add_metric_section(self, parent: ctk.CTkFrame, name: str, value, description: str):
         self._metrics.append((name, str(value)))
-        frame = tk.Frame(parent)
+        frame = ctk.CTkFrame(parent)
         frame.pack(fill="x", padx=15, pady=(5, 0))
-        tk.Label(frame, text=f"{name}:  ", font=("Arial", 11, "bold")).pack(side="left")
-        tk.Label(frame, text=str(value), font=("Arial", 11)).pack(side="left")
-        desc_label = tk.Label(parent, text=description, wraplength=450, justify="left", fg="#555555")
+        ctk.CTkLabel(frame, text=f"{name}:  ", font=("Arial", 11, "bold")).pack(side="left")
+        ctk.CTkLabel(frame, text=str(value), font=("Arial", 11)).pack(side="left")
+        desc_label = ctk.CTkLabel(parent, text=description, wraplength=450, justify="left", text_color=("gray35", "gray75"))
         desc_label.pack(anchor="w", padx=25, pady=(0, 8))
 
-    def _add_risk_contribution_table(self, parent: tk.Frame, result: AnalysisResult):
+    def _add_risk_contribution_table(self, parent: ctk.CTkFrame, result: AnalysisResult):
         self._add_section_label(parent, "Risk & Return Contribution Breakdown")
-        desc = tk.Label(parent, text=result.risk_contributions_text, wraplength=450, justify="left", fg="#555555")
+        desc = ctk.CTkLabel(parent, text=result.risk_contributions_text, wraplength=450, justify="left", text_color=("gray35", "gray75"))
         desc.pack(anchor="w", padx=25, pady=(0, 2))
-        desc2 = tk.Label(parent, text=result.return_contributions_text, wraplength=450, justify="left", fg="#555555")
+        desc2 = ctk.CTkLabel(parent, text=result.return_contributions_text, wraplength=450, justify="left", text_color=("gray35", "gray75"))
         desc2.pack(anchor="w", padx=25, pady=(0, 5))
 
         columns = ("ticker", "risk", "weight", "return")
@@ -135,8 +126,8 @@ class AnalyzePortfolioWindow:
         for index, (_, iid) in enumerate(rows):
             tree.move(iid, "", index)
 
-    def _add_copy_button(self, parent: tk.Frame):
-        btn = tk.Button(
+    def _add_copy_button(self, parent: ctk.CTkFrame):
+        btn = ctk.CTkButton(
             parent, text="Copy to Clipboard",
             command=self._copy_metrics_to_clipboard
         )
@@ -148,8 +139,7 @@ class AnalyzePortfolioWindow:
         self.window.clipboard_clear()
         self.window.clipboard_append(text)
 
-    def _add_section_label(self, parent: tk.Frame, text: str):
-        separator = ttk.Separator(parent, orient="horizontal")
-        separator.pack(fill="x", padx=15, pady=(10, 5))
-        label = tk.Label(parent, text=text, font=("Arial", 11, "bold"))
+    def _add_section_label(self, parent: ctk.CTkFrame, text: str):
+        ctk.CTkFrame(parent, height=2, fg_color=("gray75", "gray30")).pack(fill="x", padx=15, pady=(10, 5))
+        label = ctk.CTkLabel(parent, text=text, font=("Arial", 11, "bold"))
         label.pack(anchor="w", padx=15, pady=(0, 3))

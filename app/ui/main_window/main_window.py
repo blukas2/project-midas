@@ -3,6 +3,8 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+import customtkinter as ctk
+
 from matplotlib import pyplot
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -14,6 +16,7 @@ from ui.main_window.popups import *
 from ui.main_window.analyze_portfolio import AnalyzePortfolioWindow
 from ui.compare.compare import CompareWindow
 from ui.assets.find_asset import FindAssetWindow
+from ui.theme import style_chart, toggle_appearance_mode
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -23,32 +26,53 @@ if TYPE_CHECKING:
 class DropdownMenu:
     def __init__(self, root: tk.Tk, backend: BackEnd, main_window: MainWindowComponents):
         self.root = root
-        self.menu = tk.Menu(self.root)
         self.main_window = main_window
         self.backend = backend
-        root.config(menu=self.menu)
-        
+        self.menu_frame = ctk.CTkFrame(root, corner_radius=0)
+        self.menu_frame.grid(row=0, column=0, columnspan=20, sticky="ew")
         self._define_portfolio_menu()
         self._define_assets_menu()
         self._define_analysis_menu()
+        self.theme_button = ctk.CTkButton(
+            self.menu_frame,
+            text=f"Theme: {ctk.get_appearance_mode()}",
+            command=self._toggle_theme,
+        )
+        self.theme_button.pack(side="right", padx=8, pady=6)
 
     def _define_portfolio_menu(self):
-        self.portfolio_menu = tk.Menu(self.menu)
-        self.menu.add_cascade(label='Portfolio', menu=self.portfolio_menu)
+        self.portfolio_menu = self._create_menu("Portfolio")
         self.portfolio_menu.add_command(label="New", command=self._new_portfolio)
         self.portfolio_menu.add_command(label="Open", command=self._open_portfolio)
         self.portfolio_menu.add_command(label="Save", command=self._save_portfolio)
         self.portfolio_menu.add_command(label="Exit", command=self._exit_command)
 
     def _define_analysis_menu(self):
-        self.analysis_menu = tk.Menu(self.menu)
-        self.menu.add_cascade(label='Analysis', menu=self.analysis_menu)
+        self.analysis_menu = self._create_menu("Analysis")
         self.analysis_menu.add_command(label="Compare", command=self._compare_assets)
 
     def _define_assets_menu(self):
-        self.assets_menu = tk.Menu(self.menu)
-        self.menu.add_cascade(label='Assets', menu=self.assets_menu)
+        self.assets_menu = self._create_menu("Assets")
         self.assets_menu.add_command(label="Find Asset...", command=self._find_asset)
+
+    def _create_menu(self, title: str):
+        menu = tk.Menu(self.root, tearoff=False)
+        button = ctk.CTkButton(
+            self.menu_frame,
+            text=f"{title}  ▾",
+            command=lambda: self._show_menu(menu, button),
+        )
+        button.pack(side="left", padx=(8, 0), pady=6)
+        return menu
+
+    def _show_menu(self, menu, button):
+        menu.tk_popup(button.winfo_rootx(), button.winfo_rooty() + button.winfo_height())
+        menu.grab_release()
+
+    def _toggle_theme(self):
+        mode = toggle_appearance_mode()
+        self.main_window.refresh_theme()
+        self.theme_button.configure(text=f"Theme: {mode}")
 
     def _open_portfolio(self):
         self.backend.file_manager.list_portfolio_names()
@@ -94,13 +118,13 @@ class MainWindowComponents:
         self.asset_table.grid(row = 2, column = 1, columnspan = 5)
 
     def _define_buttons(self):
-        self.btn_change_position = tk.Button(self.window, text="Change Position", command=self.change_position)
-        self.btn_recalculate_portfolio = tk.Button(self.window, text="Recalculate Portfolio", command=self.recalculate_portfolio)
-        self.btn_analyze_portfolio = tk.Button(self.window, text="Analyze Portfolio", command=self.analyze_portfolio)
+        self.btn_change_position = ctk.CTkButton(self.window, text="Change Position", command=self.change_position)
+        self.btn_recalculate_portfolio = ctk.CTkButton(self.window, text="Recalculate Portfolio", command=self.recalculate_portfolio)
+        self.btn_analyze_portfolio = ctk.CTkButton(self.window, text="Analyze Portfolio", command=self.analyze_portfolio)
 
     def display_portfolio_name(self):
         text = f"Portfolio name: {self.backend.portfolio.name}"
-        self.lbl_portfolio_name = tk.Label(self.window, text=text)
+        self.lbl_portfolio_name = ctk.CTkLabel(self.window, text=text)
         self.lbl_portfolio_name.grid(row=1, column=1, columnspan=2)
 
     def _define_asset_table(self):
@@ -132,6 +156,7 @@ class MainWindowComponents:
             pass
         else:
             df.plot(x='Date', y='Value', kind='line', legend=True, ax=ax)
+        style_chart(figure)
         self.main_plot_canvas.get_tk_widget().grid(row = 2, column = 6, columnspan = 4)
 
     def plot_returns(self):
@@ -148,6 +173,7 @@ class MainWindowComponents:
             axes.set_title('Portfolio Returns')
             axes.set_ylabel('%')
             axes.bar_label(bar)
+        style_chart(figure)
         self.returns_plot_canvas.get_tk_widget().grid(row = 3, column = 6, columnspan = 4)
 
     def plot_annualized_returns(self):
@@ -164,6 +190,7 @@ class MainWindowComponents:
             axes.set_title('Portfolio Annualized Returns')
             axes.set_ylabel('%')
             axes.bar_label(bar)
+        style_chart(figure)
         self.annualized_returns_plot_canvas.get_tk_widget().grid(row = 3, column = 11, columnspan = 4)
 
     def plot_volatility(self):
@@ -180,10 +207,11 @@ class MainWindowComponents:
             axes.set_title('Portfolio Volatility')
             axes.set_ylabel('%')
             axes.bar_label(bar)
+        style_chart(figure)
         self.volatility_plot_canvas.get_tk_widget().grid(row = 3, column = 1, columnspan = 4)
 
     def plot_correlation_matrix(self):
-        f = tk.Frame(self.window)
+        f = ctk.CTkFrame(self.window)
         f.grid(row = 2, column = 11, columnspan = 4)
         try:
             df = self.backend.portfolio.correlation_matrix
@@ -191,10 +219,24 @@ class MainWindowComponents:
             df = pd.DataFrame()
         self.table = pt = Table(f, dataframe=df,
                                 showtoolbar=True, showstatusbar=True)
-        options = {'colheadercolor':'green','floatprecision': 3}
         pt.showindex = True
-        config.apply_options(options, pt)
+        config.apply_options(self._correlation_table_options(), pt)
         pt.show()
+
+    def refresh_theme(self):
+        config.apply_options(self._correlation_table_options(), self.table)
+        self.table.redraw()
+
+    def _correlation_table_options(self):
+        dark_mode = ctk.get_appearance_mode() == "Dark"
+        return {
+            "colheadercolor": "#1f6aa5" if dark_mode else "green",
+            "floatprecision": 3,
+            "cellbackgr": "#2b2b2b" if dark_mode else "#F4F4F3",
+            "textcolor": "#f2f2f2" if dark_mode else "black",
+            "grid_color": "#555555" if dark_mode else "#ABB1AD",
+            "rowselectedcolor": "#1f6aa5" if dark_mode else "#E4DED4",
+        }
 
     def analyze_portfolio(self):
         AnalyzePortfolioWindow(self.window, self.backend)

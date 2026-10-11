@@ -33,9 +33,9 @@ class TestChangePositionWindow:
 
     def test_constructor_defines_position_fields(self, monkeypatch):
         popup = Mock()
-        monkeypatch.setattr("ui.main_window.popups.tk.Toplevel", Mock(return_value=popup))
-        for name in ("Label", "Entry", "Button"):
-            monkeypatch.setattr("ui.main_window.popups.tk." + name, Mock())
+        monkeypatch.setattr("ui.main_window.popups.ctk.CTkToplevel", Mock(return_value=popup))
+        for name in ("CTkLabel", "CTkEntry", "CTkButton"):
+            monkeypatch.setattr("ui.main_window.popups.ctk." + name, Mock())
 
         window = ChangePositionWindow(object(), Mock(), Mock())
 
@@ -139,11 +139,11 @@ class TestPortfolioPopups:
         popup = Mock()
         dropdown = Mock()
         string_var = Mock()
-        monkeypatch.setattr("ui.main_window.popups.tk.Toplevel", Mock(return_value=popup))
-        monkeypatch.setattr("ui.main_window.popups.tk.Label", Mock())
-        monkeypatch.setattr("ui.main_window.popups.tk.Button", Mock())
+        monkeypatch.setattr("ui.main_window.popups.ctk.CTkToplevel", Mock(return_value=popup))
+        monkeypatch.setattr("ui.main_window.popups.ctk.CTkLabel", Mock())
+        monkeypatch.setattr("ui.main_window.popups.ctk.CTkButton", Mock())
         monkeypatch.setattr("ui.main_window.popups.tk.StringVar", Mock(return_value=string_var))
-        monkeypatch.setattr("ui.main_window.popups.tk.OptionMenu", Mock(return_value=dropdown))
+        monkeypatch.setattr("ui.main_window.popups.ctk.CTkComboBox", Mock(return_value=dropdown))
         backend = SimpleNamespace(
             file_manager=SimpleNamespace(portfolio_names_list=["Fund", "Other"])
         )
@@ -209,10 +209,10 @@ class TestPortfolioPopups:
 
     def test_new_portfolio_constructor_places_name_entry(self, monkeypatch):
         popup = Mock()
-        monkeypatch.setattr("ui.main_window.popups.tk.Toplevel", Mock(return_value=popup))
-        monkeypatch.setattr("ui.main_window.popups.tk.Label", Mock())
-        monkeypatch.setattr("ui.main_window.popups.tk.Entry", Mock())
-        monkeypatch.setattr("ui.main_window.popups.tk.Button", Mock())
+        monkeypatch.setattr("ui.main_window.popups.ctk.CTkToplevel", Mock(return_value=popup))
+        monkeypatch.setattr("ui.main_window.popups.ctk.CTkLabel", Mock())
+        monkeypatch.setattr("ui.main_window.popups.ctk.CTkEntry", Mock())
+        monkeypatch.setattr("ui.main_window.popups.ctk.CTkButton", Mock())
         backend = SimpleNamespace(file_manager=SimpleNamespace())
 
         window = NewPortfolioWindow(object(), backend, Mock())

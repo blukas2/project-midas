@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import tkinter as tk
+import customtkinter as ctk
 
 from ui.main_window.main_window import MainWindowComponents, DropdownMenu
+from ui.theme import configure_native_widget_theme, configure_theme
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -11,7 +12,9 @@ if TYPE_CHECKING:
 
 class AppWindow:
     def __init__(self, backend: BackEnd):
-        self.window = tk.Tk()
+        configure_theme()
+        self.window = ctk.CTk()
+        configure_native_widget_theme()
         self.window.title("Midas v0.0.1")
         self.main_window = MainWindowComponents(self.window, backend)
         self.dropdown_menu = DropdownMenu(self.window, backend, self.main_window)

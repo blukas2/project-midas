@@ -10,10 +10,11 @@ from ui.compare.compare import CompareWindow
 class TestCompareWindow:
     def test_constructor_configures_currency_and_asset_entries(self, monkeypatch):
         popup = Mock()
-        monkeypatch.setattr("ui.compare.compare.tk.Toplevel", Mock(return_value=popup))
-        for name in ("Label", "Entry", "Button", "StringVar"):
-            monkeypatch.setattr("ui.compare.compare.tk." + name, Mock())
-        monkeypatch.setattr("ui.compare.compare.ttk.Combobox", Mock())
+        monkeypatch.setattr("ui.compare.compare.ctk.CTkToplevel", Mock(return_value=popup))
+        for name in ("CTkLabel", "CTkEntry", "CTkButton"):
+            monkeypatch.setattr("ui.compare.compare.ctk." + name, Mock())
+        monkeypatch.setattr("ui.compare.compare.tk.StringVar", Mock())
+        monkeypatch.setattr("ui.compare.compare.ctk.CTkComboBox", Mock())
 
         window = CompareWindow(object(), Mock())
 
@@ -38,6 +39,7 @@ class TestCompareWindow:
 
     def test_compare_handles_missing_asset(self, monkeypatch):
         window = CompareWindow.__new__(CompareWindow)
+        window.window = Mock()
         window._comparison_done = False
         window._run_comparison = Mock(side_effect=AttributeError())
         error = Mock()
@@ -98,6 +100,7 @@ class TestCompareWindow:
 
     def test_empty_portfolio_is_rejected(self, monkeypatch):
         window = CompareWindow.__new__(CompareWindow)
+        window.window = Mock()
         window.backend = SimpleNamespace(portfolio=SimpleNamespace(content={}))
         error = Mock()
         monkeypatch.setattr("ui.compare.compare.msgbox.showerror", error)
@@ -118,6 +121,7 @@ class TestCompareWindow:
 
     def test_ticker_read_reports_value_error(self, monkeypatch):
         window = CompareWindow.__new__(CompareWindow)
+        window.window = Mock()
         error = Mock()
         monkeypatch.setattr("ui.compare.compare.msgbox.showerror", error)
 
@@ -137,7 +141,7 @@ class TestCompareWindow:
 
         entry.delete.assert_called_once()
         entry.insert.assert_called_once_with(0, "Fund")
-        entry.config.assert_called_once_with(state="disabled")
+        entry.configure.assert_called_once_with(state="disabled")
 
     def test_y_axis_limits_include_zero_for_positive_data(self):
         window = CompareWindow.__new__(CompareWindow)
@@ -193,7 +197,7 @@ class TestCompareWindow:
             "ui.compare.compare.pyplot.Figure", lambda **kwargs: Figure(**kwargs)
         )
         monkeypatch.setattr("ui.compare.compare.FigureCanvasTkAgg", lambda *args: canvas)
-        monkeypatch.setattr("ui.compare.compare.tk.Label", Mock())
+        monkeypatch.setattr("ui.compare.compare.ctk.CTkLabel", Mock())
 
         window._display_asset_names()
         window._plot_history_comparison()

@@ -6,7 +6,9 @@ from ui.ui import AppWindow
 class TestAppWindow:
     def test_initializes_main_window_and_runs_event_loop(self, monkeypatch):
         root = Mock()
-        monkeypatch.setattr("ui.ui.tk.Tk", lambda: root)
+        monkeypatch.setattr("ui.ui.ctk.CTk", lambda: root)
+        monkeypatch.setattr("ui.ui.configure_theme", Mock())
+        monkeypatch.setattr("ui.ui.configure_native_widget_theme", Mock())
         monkeypatch.setattr("ui.ui.MainWindowComponents", lambda window, backend: "main")
         monkeypatch.setattr("ui.ui.DropdownMenu", lambda window, backend, main: "menu")
         backend = object()
@@ -16,6 +18,7 @@ class TestAppWindow:
 
         assert application.main_window == "main"
         assert application.dropdown_menu == "menu"
+        root.title.assert_called_once_with("Midas v0.0.1")
         root.mainloop.assert_called_once_with()
 
 

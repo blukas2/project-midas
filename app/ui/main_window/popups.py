@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox as msgbox
+import customtkinter as ctk
 
 from ui.assets.find_asset import FindAssetForPositionWindow
 from ui.main_window.analyze_impact import AnalyzeImpactWindow
+from ui.dialogs import ThemedMessageBox as msgbox
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -16,22 +17,23 @@ class ChangePositionWindow:
     def __init__(self, master, subject: MainWindowComponents, backend: BackEnd):
         self.backend = backend
         self.subject = subject
-        self.window = tk.Toplevel(master)
+        self.window = ctk.CTkToplevel(master)
         self.window.title("Change Position")
+        self.window.geometry("620x130")
         self._define_components()
         self._place_components()
 
     def _define_components(self):
-        self.lbl_ticker = tk.Label(self.window, text="Ticker")
-        self.entry_ticker = tk.Entry(self.window, width = 10, borderwidth = 5)
+        self.lbl_ticker = ctk.CTkLabel(self.window, text="Ticker")
+        self.entry_ticker = ctk.CTkEntry(self.window, width=150)
 
-        self.lbl_quantity = tk.Label(self.window, text="Quantity")
-        self.entry_quantity = tk.Entry(self.window, width = 10, borderwidth = 5)
+        self.lbl_quantity = ctk.CTkLabel(self.window, text="Quantity")
+        self.entry_quantity = ctk.CTkEntry(self.window, width=150)
         
-        self.btn_find_asset = tk.Button(self.window, text="Find Asset", command=self._open_find_asset)
-        self.btn_change = tk.Button(self.window, text="Change", command=self.change_position)
-        self.btn_analyze_impact = tk.Button(self.window, text="Analyze Impact", command=self.analyze_impact)
-        self.btn_cancel = tk.Button(self.window, text="Cancel", command=self.close)
+        self.btn_find_asset = ctk.CTkButton(self.window, text="Find Asset", command=self._open_find_asset)
+        self.btn_change = ctk.CTkButton(self.window, text="Change", command=self.change_position)
+        self.btn_analyze_impact = ctk.CTkButton(self.window, text="Analyze Impact", command=self.analyze_impact)
+        self.btn_cancel = ctk.CTkButton(self.window, text="Cancel", command=self.close)
 
     def _place_components(self):
         self.lbl_ticker.grid(row = 1, column = 1, columnspan = 1)
@@ -108,21 +110,27 @@ class OpenPortfolioWindow:
     def __init__(self, master, backend: BackEnd, main_window: MainWindowComponents):
         self.backend = backend
         self.main_window = main_window
-        self.window = tk.Toplevel(master)
+        self.window = ctk.CTkToplevel(master)
         self.window.title("Opening Portfolio...")
+        self.window.geometry("420x180")
         self._define_components()
         self._place_components()
 
     def _define_components(self):
-        self.lbl_maintext = tk.Label(self.window, text="Select Portfolio")
-        ##################
+        self.lbl_maintext = ctk.CTkLabel(self.window, text="Select Portfolio")
         self.dropd_content = tk.StringVar()
         if self.backend.file_manager.portfolio_names_list:
             self.dropd_content.set(self.backend.file_manager.portfolio_names_list[0])
-        self.dropd_selecter = tk.OptionMenu(self.window, self.dropd_content , *self.backend.file_manager.portfolio_names_list)
+        self.dropd_selecter = ctk.CTkComboBox(
+            self.window,
+            variable=self.dropd_content,
+            values=self.backend.file_manager.portfolio_names_list,
+            state="readonly",
+            width=260,
+        )
         
-        self.btn_ok = tk.Button(self.window, text ="OK", command=self.load_selected_portfolio)
-        self.btn_cancel = tk.Button(self.window,text ="Cancel", command = self.close)
+        self.btn_ok = ctk.CTkButton(self.window, text="OK", command=self.load_selected_portfolio)
+        self.btn_cancel = ctk.CTkButton(self.window, text="Cancel", command=self.close)
 
     def _place_components(self):
         self.lbl_maintext.grid(row = 1, column = 1, columnspan = 2)
@@ -135,6 +143,8 @@ class OpenPortfolioWindow:
 
     def load_selected_portfolio(self):
         portfolio_name = self.dropd_content.get()
+        if not portfolio_name:
+            return
         self.backend.load_portfolio(portfolio_name)
         self.main_window.recalculate_portfolio()
         self.window.destroy()
@@ -144,17 +154,18 @@ class NewPortfolioWindow:
     def __init__(self, master, backend: BackEnd, main_window: MainWindowComponents):
         self.backend = backend
         self.main_window = main_window
-        self.window = tk.Toplevel(master)
+        self.window = ctk.CTkToplevel(master)
         self.window.title("Creating New Portfolio...")
+        self.window.geometry("420x150")
         self._define_components()
         self._place_components()
 
     def _define_components(self):
-        self.lbl_portfolio_name = tk.Label(self.window, text="Portfolio name:")
-        self.entry_portfolio_name = tk.Entry(self.window, width = 10, borderwidth = 5)
+        self.lbl_portfolio_name = ctk.CTkLabel(self.window, text="Portfolio name:")
+        self.entry_portfolio_name = ctk.CTkEntry(self.window, width=220)
         
-        self.btn_ok = tk.Button(self.window,text ="OK", command=self.new_portfolio)
-        self.btn_cancel = tk.Button(self.window,text ="Cancel", command = self.close)
+        self.btn_ok = ctk.CTkButton(self.window, text="OK", command=self.new_portfolio)
+        self.btn_cancel = ctk.CTkButton(self.window, text="Cancel", command=self.close)
 
     def _place_components(self):
         self.lbl_portfolio_name.grid(row = 1, column = 1, columnspan = 1)
@@ -170,11 +181,15 @@ class NewPortfolioWindow:
         try:
             portfolio_name = str(self.entry_portfolio_name.get())
         except ValueError:
-            msgbox.showerror(title="ERROR!", message='Invalid ticker or quantity.')
+            msgbox.showerror(title="ERROR!", message='Invalid ticker or quantity.', parent=self.window)
         else:
             self.backend.file_manager.list_portfolio_names()
             if portfolio_name in self.backend.file_manager.portfolio_names_list:
-                msgbox.showerror(title="ERROR!", message=f"Portfolio under the name '{portfolio_name}' already exists!")
+                msgbox.showerror(
+                    title="ERROR!",
+                    message=f"Portfolio under the name '{portfolio_name}' already exists!",
+                    parent=self.window,
+                )
             else:
                 self.backend.new_portfolio(portfolio_name)
                 self.main_window.display_portfolio_name()

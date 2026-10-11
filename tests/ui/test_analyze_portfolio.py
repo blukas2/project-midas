@@ -10,7 +10,7 @@ class TestAnalyzePortfolioWindow:
     def test_constructor_configures_popup_and_runs_analysis(self, monkeypatch):
         popup = Mock()
         monkeypatch.setattr(
-            "ui.main_window.analyze_portfolio.tk.Toplevel", Mock(return_value=popup)
+            "ui.main_window.analyze_portfolio.ctk.CTkToplevel", Mock(return_value=popup)
         )
         window = AnalyzePortfolioWindow.__new__(AnalyzePortfolioWindow)
         window._run_analysis = Mock()
@@ -104,8 +104,8 @@ class TestAnalyzePortfolioWindow:
     def test_metric_section_records_clipboard_values(self, monkeypatch):
         window = AnalyzePortfolioWindow.__new__(AnalyzePortfolioWindow)
         window._metrics = []
-        monkeypatch.setattr("ui.main_window.analyze_portfolio.tk.Frame", Mock())
-        monkeypatch.setattr("ui.main_window.analyze_portfolio.tk.Label", Mock())
+        monkeypatch.setattr("ui.main_window.analyze_portfolio.ctk.CTkFrame", Mock())
+        monkeypatch.setattr("ui.main_window.analyze_portfolio.ctk.CTkLabel", Mock())
 
         window._add_metric_section(Mock(), "Beta", 1.2, "Tracks market")
 
@@ -120,8 +120,8 @@ class TestAnalyzePortfolioWindow:
         )
         tree = Mock()
         monkeypatch.setattr("ui.main_window.analyze_portfolio.ttk.Treeview", Mock(return_value=tree))
-        monkeypatch.setattr("ui.main_window.analyze_portfolio.tk.Label", Mock())
-        monkeypatch.setattr("ui.main_window.analyze_portfolio.ttk.Separator", Mock())
+        monkeypatch.setattr("ui.main_window.analyze_portfolio.ctk.CTkLabel", Mock())
+        monkeypatch.setattr("ui.main_window.analyze_portfolio.ctk.CTkFrame", Mock())
 
         window._add_risk_contribution_table(Mock(), result)
 
@@ -133,47 +133,42 @@ class TestAnalyzePortfolioWindow:
 
     def test_build_ui_connects_sections_and_scroll_region(self, monkeypatch):
         window = AnalyzePortfolioWindow.__new__(AnalyzePortfolioWindow)
-        canvas, scrollable = Mock(), Mock()
+        scrollable = Mock()
         window.window = Mock()
-        window._create_scrollable_frame = Mock(return_value=(canvas, scrollable))
+        window._create_scrollable_frame = Mock(return_value=scrollable)
         window._add_header = Mock()
         window._add_metric_section = Mock()
         window._add_copy_button = Mock()
         window._add_risk_contribution_table = Mock()
-        monkeypatch.setattr("ui.main_window.analyze_portfolio.tk.Frame", Mock())
-        monkeypatch.setattr("ui.main_window.analyze_portfolio.tk.Label", Mock())
-        monkeypatch.setattr("ui.main_window.analyze_portfolio.tk.Button", Mock())
+        monkeypatch.setattr("ui.main_window.analyze_portfolio.ctk.CTkFrame", Mock())
+        monkeypatch.setattr("ui.main_window.analyze_portfolio.ctk.CTkLabel", Mock())
+        monkeypatch.setattr("ui.main_window.analyze_portfolio.ctk.CTkButton", Mock())
 
         window._build_ui(AnalysisResult())
 
         assert window._add_metric_section.call_count == 11
         window._add_copy_button.assert_called_once()
         window._add_risk_contribution_table.assert_called_once()
-        canvas.configure.assert_called_once_with(scrollregion=canvas.bbox("all"))
 
-    def test_scrollable_frame_binds_resize_and_scrollbar(self, monkeypatch):
+    def test_scrollable_frame_uses_customtkinter_container(self, monkeypatch):
         window = AnalyzePortfolioWindow.__new__(AnalyzePortfolioWindow)
         window.window = object()
-        canvas, scrollbar, frame = Mock(), Mock(), Mock()
-        monkeypatch.setattr("ui.main_window.analyze_portfolio.tk.Canvas", Mock(return_value=canvas))
-        monkeypatch.setattr("ui.main_window.analyze_portfolio.tk.Frame", Mock(return_value=frame))
+        frame = Mock()
         monkeypatch.setattr(
-            "ui.main_window.analyze_portfolio.ttk.Scrollbar", Mock(return_value=scrollbar)
+            "ui.main_window.analyze_portfolio.ctk.CTkScrollableFrame", Mock(return_value=frame)
         )
 
-        actual_canvas, actual_frame = window._create_scrollable_frame()
+        actual_frame = window._create_scrollable_frame()
 
-        assert actual_canvas is canvas
         assert actual_frame is frame
-        frame.bind.assert_called_once()
-        canvas.create_window.assert_called_once()
+        frame.pack.assert_called_once_with(fill="both", expand=True)
 
     def test_header_and_section_label(self, monkeypatch):
         window = AnalyzePortfolioWindow.__new__(AnalyzePortfolioWindow)
         label_factory = Mock()
         separator_factory = Mock()
-        monkeypatch.setattr("ui.main_window.analyze_portfolio.tk.Label", label_factory)
-        monkeypatch.setattr("ui.main_window.analyze_portfolio.ttk.Separator", separator_factory)
+        monkeypatch.setattr("ui.main_window.analyze_portfolio.ctk.CTkLabel", label_factory)
+        monkeypatch.setattr("ui.main_window.analyze_portfolio.ctk.CTkFrame", separator_factory)
         parent = Mock()
 
         window._add_header(parent, "Portfolio Analysis")

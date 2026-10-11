@@ -22,7 +22,7 @@ class TestAnalyzeImpactWindow:
     def test_constructor_configures_popup(self, monkeypatch):
         popup = Mock()
         monkeypatch.setattr(
-            "ui.main_window.analyze_impact.tk.Toplevel", Mock(return_value=popup)
+            "ui.main_window.analyze_impact.ctk.CTkToplevel", Mock(return_value=popup)
         )
         window = AnalyzeImpactWindow.__new__(AnalyzeImpactWindow)
         window._build_ui = Mock()
@@ -56,7 +56,8 @@ class TestAnalyzeImpactWindow:
         ("change", "higher_is_better", "expected"),
         [(1, True, POSITIVE_COLOR), (-1, True, NEGATIVE_COLOR),
          (-1, False, POSITIVE_COLOR), (1, False, NEGATIVE_COLOR),
-         (0, True, "black"), (1, None, "black")],
+         (0, True, ("gray15", "gray90")),
+         (1, None, ("gray15", "gray90"))],
     )
     def test_impact_color_reflects_metric_direction(self, window, change, higher_is_better, expected):
         assert window._get_impact_color(change, higher_is_better) == expected
@@ -69,13 +70,13 @@ class TestAnalyzeImpactWindow:
             labels.append((args, kwargs, label))
             return label
 
-        monkeypatch.setattr("ui.main_window.analyze_impact.tk.Label", create_label)
+        monkeypatch.setattr("ui.main_window.analyze_impact.ctk.CTkLabel", create_label)
 
         window._add_metric_row(Mock(), 2, "Alpha", 1.0, 2.0, "description", "%", "+.2f", True)
 
         assert labels[0][1]["text"] == "Alpha:"
         assert labels[3][1]["text"] == "2.0% (+1.00%)"
-        assert labels[3][1]["fg"] == POSITIVE_COLOR
+        assert labels[3][1]["text_color"] == POSITIVE_COLOR
 
     def test_add_annualized_return_uses_best_available_period(self, window):
         window.current.annualized_return_5y_text = "Five years"
@@ -102,13 +103,13 @@ class TestAnalyzeImpactWindow:
         assert window._add_metric_row.call_count == len(METRIC_CONFIGS) + 1
 
     def test_build_ui_places_header_subtitle_and_metrics(self, monkeypatch, window):
-        canvas, scrollable = Mock(), Mock()
+        scrollable = Mock()
         window.window = Mock()
-        window._create_scrollable_frame = Mock(return_value=(canvas, scrollable))
+        window._create_scrollable_frame = Mock(return_value=scrollable)
         window._add_header = Mock()
         window._add_metric_rows = Mock()
-        monkeypatch.setattr("ui.main_window.analyze_impact.tk.Label", Mock())
-        monkeypatch.setattr("ui.main_window.analyze_impact.tk.Frame", Mock())
+        monkeypatch.setattr("ui.main_window.analyze_impact.ctk.CTkLabel", Mock())
+        monkeypatch.setattr("ui.main_window.analyze_impact.ctk.CTkFrame", Mock())
 
         window._build_ui("ABC", 3)
 
@@ -116,28 +117,23 @@ class TestAnalyzeImpactWindow:
             scrollable, "Impact of adding 3 share(s) of ABC"
         )
         window._add_metric_rows.assert_called_once()
-        canvas.configure.assert_called_once_with(scrollregion=canvas.bbox("all"))
 
-    def test_create_scrollable_frame_wires_canvas_and_scrollbar(self, monkeypatch, window):
-        canvas, scrollbar, frame = Mock(), Mock(), Mock()
+    def test_create_scrollable_frame_uses_customtkinter_container(self, monkeypatch, window):
+        frame = Mock()
         window.window = object()
-        monkeypatch.setattr("ui.main_window.analyze_impact.tk.Canvas", Mock(return_value=canvas))
-        monkeypatch.setattr("ui.main_window.analyze_impact.tk.Frame", Mock(return_value=frame))
         monkeypatch.setattr(
-            "ui.main_window.analyze_impact.ttk.Scrollbar", Mock(return_value=scrollbar)
+            "ui.main_window.analyze_impact.ctk.CTkScrollableFrame", Mock(return_value=frame)
         )
 
-        actual_canvas, actual_frame = window._create_scrollable_frame()
+        actual_frame = window._create_scrollable_frame()
 
-        assert actual_canvas is canvas
         assert actual_frame is frame
-        canvas.create_window.assert_called_once()
-        canvas.configure.assert_called_once_with(yscrollcommand=scrollbar.set)
+        frame.pack.assert_called_once_with(fill="both", expand=True)
 
     def test_header_and_missing_annualized_return_are_rendered(self, monkeypatch, window):
         label_factory, separator_factory = Mock(), Mock()
-        monkeypatch.setattr("ui.main_window.analyze_impact.tk.Label", label_factory)
-        monkeypatch.setattr("ui.main_window.analyze_impact.ttk.Separator", separator_factory)
+        monkeypatch.setattr("ui.main_window.analyze_impact.ctk.CTkLabel", label_factory)
+        monkeypatch.setattr("ui.main_window.analyze_impact.ctk.CTkFrame", separator_factory)
 
         window._add_header(Mock(), "Impact")
         window.projected.annualized_return_5y = 0.0

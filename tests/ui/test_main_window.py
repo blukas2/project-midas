@@ -13,7 +13,7 @@ class TestMainWindowComponents:
         component.window = object()
         button_factory = Mock()
         tree = MagicMock()
-        monkeypatch.setattr("ui.main_window.main_window.tk.Button", button_factory)
+        monkeypatch.setattr("ui.main_window.main_window.ctk.CTkButton", button_factory)
         monkeypatch.setattr("ui.main_window.main_window.ttk.Treeview", Mock(return_value=tree))
 
         component._define_buttons()
@@ -29,7 +29,7 @@ class TestMainWindowComponents:
         component.window = object()
         component.backend = SimpleNamespace(portfolio=SimpleNamespace(name="Growth"))
         label = Mock()
-        monkeypatch.setattr("ui.main_window.main_window.tk.Label", Mock(return_value=label))
+        monkeypatch.setattr("ui.main_window.main_window.ctk.CTkLabel", Mock(return_value=label))
 
         component.display_portfolio_name()
 
@@ -52,6 +52,19 @@ class TestMainWindowComponents:
         component.asset_table.delete.assert_called_once_with()
         component.asset_table.insert.assert_called_once()
         assert component.asset_table.insert.call_args.kwargs["values"] == ("ABC", "Alpha", 2, 12.5, 25)
+
+    def test_refresh_theme_restyles_correlation_table(self, monkeypatch):
+        component = MainWindowComponents.__new__(MainWindowComponents)
+        component.table = Mock()
+        apply_options = Mock()
+        monkeypatch.setattr("ui.main_window.main_window.config.apply_options", apply_options)
+        monkeypatch.setattr("ui.main_window.main_window.ctk.get_appearance_mode", lambda: "Dark")
+
+        component.refresh_theme()
+
+        apply_options.assert_called_once()
+        assert apply_options.call_args.args[1] is component.table
+        component.table.redraw.assert_called_once_with()
 
     def test_recalculate_refreshes_portfolio_views(self):
         component = MainWindowComponents.__new__(MainWindowComponents)
@@ -82,7 +95,8 @@ class TestMainWindowComponents:
         monkeypatch.setattr("ui.main_window.main_window.Figure", lambda **kwargs: figure)
         monkeypatch.setattr("ui.main_window.main_window.pyplot.Figure", lambda **kwargs: figure)
         monkeypatch.setattr("ui.main_window.main_window.FigureCanvasTkAgg", lambda *args: canvas)
-        monkeypatch.setattr("ui.main_window.main_window.tk.Frame", Mock())
+        monkeypatch.setattr("ui.main_window.main_window.ctk.CTkFrame", Mock())
+        monkeypatch.setattr("ui.main_window.main_window.style_chart", Mock())
         monkeypatch.setattr("ui.main_window.main_window.Table", Mock())
         monkeypatch.setattr("ui.main_window.main_window.config.apply_options", Mock())
 
@@ -115,7 +129,8 @@ class TestMainWindowComponents:
             "ui.main_window.main_window.pyplot.Figure", lambda **kwargs: Figure(**kwargs)
         )
         monkeypatch.setattr("ui.main_window.main_window.FigureCanvasTkAgg", lambda *args: canvas)
-        monkeypatch.setattr("ui.main_window.main_window.tk.Frame", Mock())
+        monkeypatch.setattr("ui.main_window.main_window.ctk.CTkFrame", Mock())
+        monkeypatch.setattr("ui.main_window.main_window.style_chart", Mock())
         monkeypatch.setattr("ui.main_window.main_window.Table", Mock())
         monkeypatch.setattr("ui.main_window.main_window.config.apply_options", Mock())
 
@@ -146,7 +161,10 @@ class TestDropdownMenu:
     def test_constructor_builds_all_menu_groups(self, monkeypatch):
         root = Mock()
         menu = Mock()
+        frame = Mock()
         monkeypatch.setattr("ui.main_window.main_window.tk.Menu", Mock(return_value=menu))
+        monkeypatch.setattr("ui.main_window.main_window.ctk.CTkFrame", Mock(return_value=frame))
+        monkeypatch.setattr("ui.main_window.main_window.ctk.CTkButton", Mock())
         backend, main_window = object(), object()
 
         dropdown = DropdownMenu(root, backend, main_window)
@@ -154,8 +172,8 @@ class TestDropdownMenu:
         assert dropdown.root is root
         assert dropdown.backend is backend
         assert dropdown.main_window is main_window
-        assert menu.add_cascade.call_count == 3
-        root.config.assert_called_once_with(menu=menu)
+        assert menu.add_command.call_count == 6
+        frame.grid.assert_called_once()
 
     def test_portfolio_commands_delegate_to_backend_and_windows(self, monkeypatch):
         menu = DropdownMenu.__new__(DropdownMenu)

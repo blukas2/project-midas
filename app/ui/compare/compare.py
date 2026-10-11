@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk, messagebox as msgbox
+import customtkinter as ctk
 
 from matplotlib import pyplot
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from ui.assets.find_asset import FindAssetForCompareWindow
+from ui.dialogs import ThemedMessageBox as msgbox
+from ui.theme import style_chart
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -15,8 +17,9 @@ if TYPE_CHECKING:
 
 class CompareWindow:
     def __init__(self, master, backend: BackEnd):
-        self.window = tk.Toplevel(master)
+        self.window = ctk.CTkToplevel(master)
         self.window.title("Compare assets")
+        self.window.geometry("1100x850")
         self.backend = backend
         self.chart_dpi = 80
         self._use_portfolio_for_asset1 = False
@@ -28,21 +31,24 @@ class CompareWindow:
 
 
     def _define_components(self):
-        self.lbl_asset1_title = tk.Label(self.window, text="Asset 1: ") 
-        self.lbl_asset2_title = tk.Label(self.window, text="Asset 2: ")
-        self.entry_asset1_ticker = tk.Entry(self.window, width = 10, borderwidth = 5)
-        self.entry_asset2_ticker = tk.Entry(self.window, width = 10, borderwidth = 5)
-        self.btn_find_asset1 = tk.Button(self.window, text="Find Asset", command=self._open_find_asset1)
-        self.btn_find_asset2 = tk.Button(self.window, text="Find Asset", command=self._open_find_asset2)
-        self.btn_portfolio_asset1 = tk.Button(self.window, text="Use Portfolio", command=self._use_portfolio_as_asset1)
-        self.btn_portfolio_asset2 = tk.Button(self.window, text="Use Portfolio", command=self._use_portfolio_as_asset2)
-        self.btn_compare = tk.Button(self.window,text ="Compare!", command = self.compare)
+        self.lbl_asset1_title = ctk.CTkLabel(self.window, text="Asset 1: ")
+        self.lbl_asset2_title = ctk.CTkLabel(self.window, text="Asset 2: ")
+        self.entry_asset1_ticker = ctk.CTkEntry(self.window, width=150)
+        self.entry_asset2_ticker = ctk.CTkEntry(self.window, width=150)
+        self.btn_find_asset1 = ctk.CTkButton(self.window, text="Find Asset", command=self._open_find_asset1)
+        self.btn_find_asset2 = ctk.CTkButton(self.window, text="Find Asset", command=self._open_find_asset2)
+        self.btn_portfolio_asset1 = ctk.CTkButton(self.window, text="Use Portfolio", command=self._use_portfolio_as_asset1)
+        self.btn_portfolio_asset2 = ctk.CTkButton(self.window, text="Use Portfolio", command=self._use_portfolio_as_asset2)
+        self.btn_compare = ctk.CTkButton(self.window, text="Compare!", command=self.compare)
         self._currency_var = tk.StringVar(value="EUR")
-        self.dropdown_currency = ttk.Combobox(
-            self.window, textvariable=self._currency_var,
-            values=["EUR", "Local"], state="readonly", width=12
+        self.dropdown_currency = ctk.CTkComboBox(
+            self.window,
+            variable=self._currency_var,
+            values=["EUR", "Local"],
+            state="readonly",
+            width=160,
+            command=self._on_currency_change,
         )
-        self.dropdown_currency.bind("<<ComboboxSelected>>", self._on_currency_change)
 
     def _place_components(self):
         self.lbl_asset1_title.grid(row = 1, column = 1, columnspan = 1)
@@ -60,7 +66,11 @@ class CompareWindow:
         try:
             self._run_comparison()
         except AttributeError:
-            msgbox.showerror(title="ERROR!", message='No data found, one of the symbols may be delisted.')
+            msgbox.showerror(
+                title="ERROR!",
+                message='No data found, one of the symbols may be delisted.',
+                parent=self.window,
+            )
         else:
             self._comparison_done = True
             self._show_in_eur = True
@@ -85,7 +95,7 @@ class CompareWindow:
     def _run_comparison(self):
         portfolio = self.backend.portfolio
         if self._use_portfolio_for_asset1 and self._use_portfolio_for_asset2:
-            msgbox.showerror(title="ERROR!", message='Cannot use portfolio for both assets.')
+            msgbox.showerror(title="ERROR!", message='Cannot use portfolio for both assets.', parent=self.window)
             return
         if self._use_portfolio_for_asset1:
             ticker = self._read_ticker(self.entry_asset2_ticker, 'Asset 2')
@@ -101,11 +111,15 @@ class CompareWindow:
             if (asset1 is not None) and (asset2 is not None):
                 self.backend.comparer.compare(asset1, asset2)
 
-    def _read_ticker(self, entry: tk.Entry, entry_name):
+    def _read_ticker(self, entry: ctk.CTkEntry, entry_name):
         try:
             ticker = str(entry.get())
         except ValueError:
-            msgbox.showerror(title="ERROR!", message=f"Invalid ticker or quantity for '{entry_name}'.")
+            msgbox.showerror(
+                title="ERROR!",
+                message=f"Invalid ticker or quantity for '{entry_name}'.",
+                parent=self.window,
+            )
         else:
             return ticker
         
@@ -123,24 +137,24 @@ class CompareWindow:
 
     def _is_portfolio_loaded(self) -> bool:
         if not self.backend.portfolio.content:
-            msgbox.showerror(title="ERROR!", message='No portfolio loaded.')
+            msgbox.showerror(title="ERROR!", message='No portfolio loaded.', parent=self.window)
             return False
         return True
 
-    def _set_entry_to_portfolio_name(self, entry: tk.Entry):
+    def _set_entry_to_portfolio_name(self, entry: ctk.CTkEntry):
         name = self.backend.portfolio.name or "Portfolio"
         entry.delete(0, tk.END)
         entry.insert(0, name)
-        entry.config(state='disabled')
+        entry.configure(state="disabled")
 
     def _open_find_asset1(self):
         self._use_portfolio_for_asset1 = False
-        self.entry_asset1_ticker.config(state='normal')
+        self.entry_asset1_ticker.configure(state='normal')
         FindAssetForCompareWindow(self.window, self.backend, self._prefill_asset1_ticker)
 
     def _open_find_asset2(self):
         self._use_portfolio_for_asset2 = False
-        self.entry_asset2_ticker.config(state='normal')
+        self.entry_asset2_ticker.configure(state='normal')
         FindAssetForCompareWindow(self.window, self.backend, self._prefill_asset2_ticker)
 
     def _prefill_asset1_ticker(self, ticker: str):
@@ -152,9 +166,9 @@ class CompareWindow:
         self.entry_asset2_ticker.insert(0, ticker)
 
     def _display_asset_names(self):
-        self.lbl_asset1_name = tk.Label(self.window, text=self.backend.comparer.asset1_name)
+        self.lbl_asset1_name = ctk.CTkLabel(self.window, text=self.backend.comparer.asset1_name)
         self.lbl_asset1_name.grid(row = 4, column = 1, columnspan = 2)
-        self.lbl_asset2_name = tk.Label(self.window, text=self.backend.comparer.asset2_name)
+        self.lbl_asset2_name = ctk.CTkLabel(self.window, text=self.backend.comparer.asset2_name)
         self.lbl_asset2_name.grid(row = 4, column = 2, columnspan = 2)
 
     def _plot_history_comparison(self):
@@ -169,6 +183,7 @@ class CompareWindow:
         else:
             df.plot(x='Date', y='asset1_price_index', kind='line', legend=True, ax=ax)
             df.plot(x='Date', y='asset2_price_index', kind='line', legend=True, ax=ax)
+        style_chart(figure)
         self.main_plot_canvas.get_tk_widget().grid(row = 5, column = 1, columnspan = 4)
 
     def _plot_annualized_returns_asset1(self):
@@ -188,6 +203,7 @@ class CompareWindow:
             min_limit, max_limit = self._get_y_axes_limits(self.backend.comparer.asset1_annualized_returns, 
                                                            self.backend.comparer.asset2_annualized_returns)
             axes.set_ylim(min_limit, max_limit)
+        style_chart(figure)
         self.annualized_returns_plot_canvas_asset1.get_tk_widget().grid(row = 6, column = 1, columnspan = 2)
 
     def _plot_annualized_returns_asset2(self):
@@ -207,6 +223,7 @@ class CompareWindow:
             min_limit, max_limit = self._get_y_axes_limits(self.backend.comparer.asset1_annualized_returns, 
                                                            self.backend.comparer.asset2_annualized_returns)
             axes.set_ylim(min_limit, max_limit)
+        style_chart(figure)
         self.annualized_returns_plot_canvas_asset1.get_tk_widget().grid(row = 6, column = 3, columnspan = 2)
 
     def _plot_volatility_asset1(self):
@@ -227,6 +244,7 @@ class CompareWindow:
                 self.backend.comparer.asset1_volatility,
                 self.backend.comparer.asset2_volatility)
             axes.set_ylim(min_limit, max_limit)
+        style_chart(figure)
         self.volatility_canvas_asset1.get_tk_widget().grid(row=7, column=1, columnspan=2)
 
     def _plot_volatility_asset2(self):
@@ -247,6 +265,7 @@ class CompareWindow:
                 self.backend.comparer.asset1_volatility,
                 self.backend.comparer.asset2_volatility)
             axes.set_ylim(min_limit, max_limit)
+        style_chart(figure)
         self.volatility_canvas_asset2.get_tk_widget().grid(row=7, column=3, columnspan=2)
 
     def _get_y_axes_limits(self, asset1_data: dict, asset2_data: dict):
