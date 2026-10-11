@@ -97,17 +97,27 @@ class AnalyzePortfolioWindow:
         desc2 = tk.Label(parent, text=result.return_contributions_text, wraplength=450, justify="left", fg="#555555")
         desc2.pack(anchor="w", padx=25, pady=(0, 5))
 
-        columns = ("ticker", "risk", "return")
+        columns = ("ticker", "risk", "weight", "return")
         tree = ttk.Treeview(parent, columns=columns, show="headings", height=min(len(result.risk_contributions), 12))
-        for col, label in [("ticker", "Ticker"), ("risk", "Risk Contribution %"), ("return", "Return Contribution %")]:
+        for col, label in [
+            ("ticker", "Ticker"),
+            ("risk", "Risk Contribution %"),
+            ("weight", "Portfolio Weight %"),
+            ("return", "Return Contribution %"),
+        ]:
             tree.heading(col, text=label, command=lambda c=col: self._sort_treeview(tree, c))
         tree.column("ticker", width=150)
         tree.column("risk", width=160)
+        tree.column("weight", width=150)
         tree.column("return", width=170)
 
         for ticker, risk_pct in sorted(result.risk_contributions.items(), key=lambda x: -x[1]):
             ret_pct = result.return_contributions.get(ticker, 0.0)
-            tree.insert("", "end", values=(ticker, f"{risk_pct:.1f}%", f"{ret_pct:.2f}%"))
+            weight_pct = result.portfolio_weights[ticker]
+            tree.insert(
+                "", "end",
+                values=(ticker, f"{risk_pct:.1f}%", f"{weight_pct:.1f}%", f"{ret_pct:.2f}%"),
+            )
         tree.pack(padx=25, pady=(0, 15))
         self._sort_ascending: dict[str, bool] = {}
 

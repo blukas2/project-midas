@@ -49,6 +49,7 @@ class AnalysisResult:
     diversification_text: str = ""
     effective_bets: float = 0.0
     effective_bets_text: str = ""
+    portfolio_weights: dict[str, float] = field(default_factory=dict)
     risk_contributions: dict[str, float] = field(default_factory=dict)
     risk_contributions_text: str = ""
     return_contributions: dict[str, float] = field(default_factory=dict)
@@ -80,6 +81,7 @@ class PortfolioAnalyzer:
         self._fill_max_drawdown(result)
         self._fill_diversification(result, weights, asset_returns)
         self._fill_effective_bets(result)
+        self._fill_portfolio_weights(result, weights, asset_returns)
         self._fill_risk_contributions(result, weights, asset_returns)
         self._fill_return_contributions(result, weights, asset_returns)
         return result
@@ -293,6 +295,13 @@ class PortfolioAnalyzer:
         result.effective_bets_text = self.interpreter.interpret_effective_bets(
             effective, result.num_assets
         )
+
+    def _fill_portfolio_weights(self, result: AnalysisResult, weights: np.ndarray, asset_returns: pd.DataFrame):
+        tickers = list(asset_returns.columns)
+        result.portfolio_weights = {
+            ticker: round(weights[index] * 100, 1)
+            for index, ticker in enumerate(tickers)
+        }
 
     # --- Risk Contribution Breakdown ---
 
