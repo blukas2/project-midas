@@ -2,7 +2,6 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pandas as pd
-from matplotlib.figure import Figure
 
 from ui.assets.find_asset import (
     FindAssetForCompareWindow,
@@ -12,22 +11,22 @@ from ui.assets.find_asset import (
 
 
 class TestFindAssetWindow:
-    def test_constructor_builds_controls_and_chart_placeholders(self, monkeypatch):
+    def test_constructor_builds_controls_and_dashboard(self, monkeypatch):
         popup = Mock()
-        figure = Mock()
         monkeypatch.setattr("ui.assets.find_asset.ctk.CTkToplevel", Mock(return_value=popup))
         for name in ("CTkLabel", "CTkEntry", "CTkButton", "CTkScrollableFrame"):
             monkeypatch.setattr("ui.assets.find_asset.ctk." + name, Mock())
         monkeypatch.setattr("ui.assets.find_asset.tk.StringVar", Mock())
         monkeypatch.setattr("ui.assets.find_asset.ctk.CTkComboBox", Mock())
-        monkeypatch.setattr("ui.assets.find_asset.Figure", Mock(return_value=figure))
-        monkeypatch.setattr("ui.assets.find_asset.FigureCanvasTkAgg", Mock())
+        dashboard = Mock()
+        monkeypatch.setattr("ui.assets.find_asset.PlotlyDashboard", Mock(return_value=dashboard))
 
         window = FindAssetWindow(object(), Mock())
 
         assert window.window is popup
         assert window.show_in_eur is False
         assert window.search_results == []
+        assert window.chart_dashboard is dashboard
         popup.title.assert_called_once_with("Find Asset")
 
     def test_position_picker_defaults_to_eur_and_exposes_select_buttons(self, monkeypatch):
@@ -37,8 +36,7 @@ class TestFindAssetWindow:
             monkeypatch.setattr("ui.assets.find_asset.ctk." + name, Mock())
         monkeypatch.setattr("ui.assets.find_asset.tk.StringVar", Mock())
         monkeypatch.setattr("ui.assets.find_asset.ctk.CTkComboBox", Mock())
-        monkeypatch.setattr("ui.assets.find_asset.Figure", Mock(return_value=Mock()))
-        monkeypatch.setattr("ui.assets.find_asset.FigureCanvasTkAgg", Mock())
+        monkeypatch.setattr("ui.assets.find_asset.PlotlyDashboard", Mock(return_value=Mock()))
         callback = Mock()
 
         window = FindAssetForPositionWindow(object(), Mock(), callback)
@@ -194,48 +192,41 @@ class TestFindAssetWindow:
         window.on_select_callback.assert_called_once_with("ABC")
         window.window.destroy.assert_called_once_with()
 
-    def test_grouped_returns_draw_asset_and_portfolio_bars(self):
+    def test_position_returns_group_asset_and_portfolio_values(self):
         window = FindAssetForPositionWindow.__new__(FindAssetForPositionWindow)
         window.backend = SimpleNamespace(
             portfolio=SimpleNamespace(annualized_returns={"1y": 2, "5y": 5})
         )
-        axes = Mock()
-        axes.bar.side_effect = [object(), object()]
+        window.chart_factory = Mock()
+        window.show_in_eur = True
 
-        window._plot_grouped_annualized_returns(axes, {"1y": 1, "3y": 3})
+        window._position_returns_figure({"1y": 1, "3y": 3})
 
-        assert axes.bar.call_count == 2
-        axes.set_xticklabels.assert_called_once_with(["1y", "3y"])
+        window.chart_factory.grouped_bar_chart.assert_called_once_with(
+            [("Asset", {"1y": 1, "3y": 3}), ("Portfolio", {"1y": 2, "5y": 5})],
+            "Light",
+        )
 
-    def test_refresh_charts_updates_price_and_annualized_returns(self, monkeypatch):
-        history = SimpleNamespace(plot=Mock())
+    def test_refresh_charts_updates_dashboard_and_last_price(self):
         analyzer = SimpleNamespace(
             get_last_closing_price=lambda eur: 12,
             get_currency_label=lambda eur: "USD",
-            get_price_history=lambda eur: history,
-            get_annualized_returns=lambda eur: {},
         )
         window = FindAssetWindow.__new__(FindAssetWindow)
-        window.window = Mock()
         window.backend = SimpleNamespace(asset_analyzer=analyzer)
         window.show_in_eur = False
         window.lbl_last_price = Mock()
-        window.price_figure = Mock()
-        window.returns_figure = Mock()
-        window.price_canvas = Mock()
-        window.returns_canvas = Mock()
-        window.price_figure.add_subplot.return_value = Mock()
-        window.returns_figure.add_subplot.return_value = Mock()
+        window.chart_dashboard = Mock()
+        window._build_chart_figures = Mock(return_value={"history": object()})
 
-        monkeypatch.setattr("ui.assets.find_asset.style_chart", Mock())
         window._refresh_charts()
 
-        history.plot.assert_called_once()
-        window.price_canvas.draw.assert_called_once()
-        window.returns_canvas.draw.assert_called_once()
+        window.chart_dashboard.render.assert_called_once_with(
+            window._build_chart_figures.return_value
+        )
         window.lbl_last_price.configure.assert_called_once_with(text="Last Close: 12.00 USD")
 
-    def test_position_picker_plots_eur_asset_against_portfolio(self, monkeypatch):
+    def test_position_picker_builds_eur_asset_and_portfolio_charts(self):
         dates = pd.to_datetime(["2024-01-01", "2024-01-02"])
         analyzer = SimpleNamespace(
             get_currency_label=lambda eur: "EUR",
@@ -250,17 +241,16 @@ class TestFindAssetWindow:
         window = FindAssetForPositionWindow.__new__(FindAssetForPositionWindow)
         window.backend = SimpleNamespace(
             asset_analyzer=analyzer,
-            portfolio=SimpleNamespace(annualized_returns={"1y": 3}),
+            portfolio=SimpleNamespace(history=pd.DataFrame(), annualized_returns={"1y": 3}),
         )
+        window.chart_factory = Mock()
         window.show_in_eur = True
-        window.price_figure, window.returns_figure = Figure(), Figure()
-        window.price_canvas, window.returns_canvas = Mock(), Mock()
 
-        window._plot_price_history()
-        window._plot_annualized_returns()
+        window._build_chart_figures()
 
-        window.price_canvas.draw.assert_called_once()
-        window.returns_canvas.draw.assert_called_once()
+        series = window.chart_factory.line_chart.call_args.args[0]
+        assert [item[0] for item in series] == ["Asset", "Portfolio"]
+        window.chart_factory.grouped_bar_chart.assert_called_once()
 
     def test_picker_cancel_closes_without_selecting(self):
         window = FindAssetForCompareWindow.__new__(FindAssetForCompareWindow)

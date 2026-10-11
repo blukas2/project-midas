@@ -3,13 +3,11 @@ from __future__ import annotations
 import tkinter as tk
 import customtkinter as ctk
 
-from matplotlib import pyplot
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-
 from ui.assets.find_asset import FindAssetForCompareWindow
+from ui.charts.figure_factory import FigureFactory
+from ui.charts.page_builder import ChartCardSpec
+from ui.charts.plotly_dashboard import PlotlyDashboard
 from ui.dialogs import ThemedMessageBox as msgbox
-from ui.theme import style_chart
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -21,7 +19,7 @@ class CompareWindow:
         self.window.title("Compare assets")
         self.window.geometry("1100x850")
         self.backend = backend
-        self.chart_dpi = 80
+        self.chart_factory = FigureFactory()
         self._use_portfolio_for_asset1 = False
         self._use_portfolio_for_asset2 = False
         self._show_in_eur = True
@@ -29,8 +27,12 @@ class CompareWindow:
         self._define_components()
         self._place_components()
 
-
     def _define_components(self):
+        self._define_asset_controls()
+        self._define_currency_control()
+        self._define_chart_dashboard()
+
+    def _define_asset_controls(self):
         self.lbl_asset1_title = ctk.CTkLabel(self.window, text="Asset 1: ")
         self.lbl_asset2_title = ctk.CTkLabel(self.window, text="Asset 2: ")
         self.entry_asset1_ticker = ctk.CTkEntry(self.window, width=150)
@@ -40,6 +42,8 @@ class CompareWindow:
         self.btn_portfolio_asset1 = ctk.CTkButton(self.window, text="Use Portfolio", command=self._use_portfolio_as_asset1)
         self.btn_portfolio_asset2 = ctk.CTkButton(self.window, text="Use Portfolio", command=self._use_portfolio_as_asset2)
         self.btn_compare = ctk.CTkButton(self.window, text="Compare!", command=self.compare)
+
+    def _define_currency_control(self):
         self._currency_var = tk.StringVar(value="EUR")
         self.dropdown_currency = ctk.CTkComboBox(
             self.window,
@@ -50,17 +54,37 @@ class CompareWindow:
             command=self._on_currency_change,
         )
 
+    def _define_chart_dashboard(self):
+        cards = [
+            ChartCardSpec("comparison-history", "Normalized price history", wide=True),
+            ChartCardSpec("comparison-returns", "Annualized returns"),
+            ChartCardSpec("comparison-volatility", "Volatility"),
+        ]
+        self.dashboard = PlotlyDashboard(
+            self.window, "Asset comparison", cards, include_metrics=True, height=650
+        )
+
     def _place_components(self):
-        self.lbl_asset1_title.grid(row = 1, column = 1, columnspan = 1)
-        self.entry_asset1_ticker.grid(row = 1, column = 2, columnspan = 1)
-        self.btn_find_asset1.grid(row = 1, column = 3, columnspan = 1)
-        self.btn_portfolio_asset1.grid(row = 1, column = 4, columnspan = 1)
-        self.lbl_asset2_title.grid(row = 2, column = 1, columnspan = 1)
-        self.entry_asset2_ticker.grid(row = 2, column = 2, columnspan = 1)
-        self.btn_find_asset2.grid(row = 2, column = 3, columnspan = 1)
-        self.btn_portfolio_asset2.grid(row = 2, column = 4, columnspan = 1)
-        self.btn_compare.grid(row = 3, column = 1, columnspan = 2)
-        self.dropdown_currency.grid(row = 3, column = 3, columnspan = 2)
+        self._place_asset_controls()
+        self._configure_chart_area()
+
+    def _place_asset_controls(self):
+        self.lbl_asset1_title.grid(row=1, column=1)
+        self.entry_asset1_ticker.grid(row=1, column=2)
+        self.btn_find_asset1.grid(row=1, column=3)
+        self.btn_portfolio_asset1.grid(row=1, column=4)
+        self.lbl_asset2_title.grid(row=2, column=1)
+        self.entry_asset2_ticker.grid(row=2, column=2)
+        self.btn_find_asset2.grid(row=2, column=3)
+        self.btn_portfolio_asset2.grid(row=2, column=4)
+        self.btn_compare.grid(row=3, column=1, columnspan=2)
+        self.dropdown_currency.grid(row=3, column=3, columnspan=2)
+
+    def _configure_chart_area(self):
+        self.dashboard.grid(row=4, column=1, columnspan=4, sticky="nsew", padx=8, pady=8)
+        self.window.rowconfigure(4, weight=1)
+        for column in range(1, 5):
+            self.window.columnconfigure(column, weight=1)
 
     def compare(self):
         try:
@@ -85,31 +109,70 @@ class CompareWindow:
         self._display_charts()
 
     def _display_charts(self):
-        self._display_asset_names()
-        self._plot_history_comparison()
-        self._plot_annualized_returns_asset1()
-        self._plot_annualized_returns_asset2()
-        self._plot_volatility_asset1()
-        self._plot_volatility_asset2()
+        comparer = self.backend.comparer
+        figures = self._comparison_figures(comparer)
+        metrics = [("Asset 1", comparer.asset1_name), ("Asset 2", comparer.asset2_name)]
+        self.dashboard.render(
+            figures, metrics, subtitle=f"Comparison in {self._currency_var.get()}"
+        )
+
+    def _comparison_figures(self, comparer):
+        mode = ctk.get_appearance_mode()
+        return {
+            "comparison-history": self._history_figure(comparer, mode),
+            "comparison-returns": self._metric_figure(comparer, "annualized_returns", mode),
+            "comparison-volatility": self._metric_figure(comparer, "volatility", mode),
+        }
+
+    def _history_figure(self, comparer, mode):
+        table = comparer.compare_table
+        series = self._history_series(comparer, table)
+        return self.chart_factory.line_chart(series, mode, "Indexed price (100 = start)")
+
+    def _history_series(self, comparer, table):
+        dates = table["Date"].tolist()
+        return [
+            (comparer.asset1_name, dates, table["asset1_price_index"].tolist()),
+            (comparer.asset2_name, dates, table["asset2_price_index"].tolist()),
+        ]
+
+    def _metric_figure(self, comparer, metric, mode):
+        series = self._comparison_metric_series(comparer, metric)
+        axis_title = "Volatility" if metric == "volatility" else "Annualized return"
+        return self.chart_factory.grouped_bar_chart(series, mode, axis_title)
+
+    def _comparison_metric_series(self, comparer, metric):
+        return [
+            (comparer.asset1_name, getattr(comparer, f"asset1_{metric}")),
+            (comparer.asset2_name, getattr(comparer, f"asset2_{metric}")),
+        ]
 
     def _run_comparison(self):
-        portfolio = self.backend.portfolio
         if self._use_portfolio_for_asset1 and self._use_portfolio_for_asset2:
-            msgbox.showerror(title="ERROR!", message='Cannot use portfolio for both assets.', parent=self.window)
+            self._show_invalid_portfolio_selection()
             return
         if self._use_portfolio_for_asset1:
-            ticker = self._read_ticker(self.entry_asset2_ticker, 'Asset 2')
-            if ticker is not None:
-                self.backend.comparer.compare_with_portfolio(portfolio, ticker, 1)
+            self._compare_portfolio_and_ticker(self.entry_asset2_ticker, "Asset 2", 1)
         elif self._use_portfolio_for_asset2:
-            ticker = self._read_ticker(self.entry_asset1_ticker, 'Asset 1')
-            if ticker is not None:
-                self.backend.comparer.compare_with_portfolio(portfolio, ticker, 2)
+            self._compare_portfolio_and_ticker(self.entry_asset1_ticker, "Asset 1", 2)
         else:
-            asset1 = self._read_ticker(self.entry_asset1_ticker, 'Asset 1')
-            asset2 = self._read_ticker(self.entry_asset2_ticker, 'Asset 2')
-            if (asset1 is not None) and (asset2 is not None):
-                self.backend.comparer.compare(asset1, asset2)
+            self._compare_two_tickers()
+
+    def _show_invalid_portfolio_selection(self):
+        msgbox.showerror(
+            title="ERROR!", message="Cannot use portfolio for both assets.", parent=self.window
+        )
+
+    def _compare_portfolio_and_ticker(self, entry, entry_name, position):
+        ticker = self._read_ticker(entry, entry_name)
+        if ticker is not None:
+            self.backend.comparer.compare_with_portfolio(self.backend.portfolio, ticker, position)
+
+    def _compare_two_tickers(self):
+        ticker1 = self._read_ticker(self.entry_asset1_ticker, "Asset 1")
+        ticker2 = self._read_ticker(self.entry_asset2_ticker, "Asset 2")
+        if ticker1 is not None and ticker2 is not None:
+            self.backend.comparer.compare(ticker1, ticker2)
 
     def _read_ticker(self, entry: ctk.CTkEntry, entry_name):
         try:
@@ -164,117 +227,3 @@ class CompareWindow:
     def _prefill_asset2_ticker(self, ticker: str):
         self.entry_asset2_ticker.delete(0, tk.END)
         self.entry_asset2_ticker.insert(0, ticker)
-
-    def _display_asset_names(self):
-        self.lbl_asset1_name = ctk.CTkLabel(self.window, text=self.backend.comparer.asset1_name)
-        self.lbl_asset1_name.grid(row = 4, column = 1, columnspan = 2)
-        self.lbl_asset2_name = ctk.CTkLabel(self.window, text=self.backend.comparer.asset2_name)
-        self.lbl_asset2_name.grid(row = 4, column = 2, columnspan = 2)
-
-    def _plot_history_comparison(self):
-        figure = pyplot.Figure(figsize=(10,4), dpi=self.chart_dpi)
-        ax = figure.add_subplot(111)
-        self.main_plot_canvas = FigureCanvasTkAgg(figure, self.window)        
-        ax.set_title('Price History')
-        try:
-            df = self.backend.comparer.compare_table[['Date', 'asset1_price_index', 'asset2_price_index']]
-        except AttributeError:
-            pass
-        else:
-            df.plot(x='Date', y='asset1_price_index', kind='line', legend=True, ax=ax)
-            df.plot(x='Date', y='asset2_price_index', kind='line', legend=True, ax=ax)
-        style_chart(figure)
-        self.main_plot_canvas.get_tk_widget().grid(row = 5, column = 1, columnspan = 4)
-
-    def _plot_annualized_returns_asset1(self):
-        figure = Figure(figsize=(5, 3), dpi=self.chart_dpi)
-        self.annualized_returns_plot_canvas_asset1 = FigureCanvasTkAgg(figure, self.window)
-        axes = figure.add_subplot()
-        try:
-            periods = self.backend.comparer.asset1_annualized_returns.keys()
-            returns = self.backend.comparer.asset1_annualized_returns.values()
-        except AttributeError:
-            pass
-        else:
-            bar = axes.bar(periods, returns)
-            axes.set_title('Portfolio Annualized Returns')
-            axes.set_ylabel('%')
-            axes.bar_label(bar)
-            min_limit, max_limit = self._get_y_axes_limits(self.backend.comparer.asset1_annualized_returns, 
-                                                           self.backend.comparer.asset2_annualized_returns)
-            axes.set_ylim(min_limit, max_limit)
-        style_chart(figure)
-        self.annualized_returns_plot_canvas_asset1.get_tk_widget().grid(row = 6, column = 1, columnspan = 2)
-
-    def _plot_annualized_returns_asset2(self):
-        figure = Figure(figsize=(5, 3), dpi=self.chart_dpi)
-        self.annualized_returns_plot_canvas_asset1 = FigureCanvasTkAgg(figure, self.window)
-        axes = figure.add_subplot()
-        try:
-            periods = self.backend.comparer.asset2_annualized_returns.keys()
-            returns = self.backend.comparer.asset2_annualized_returns.values()
-        except AttributeError:
-            pass
-        else:
-            bar = axes.bar(periods, returns)
-            axes.set_title('Portfolio Annualized Returns')
-            axes.set_ylabel('%')
-            axes.bar_label(bar)
-            min_limit, max_limit = self._get_y_axes_limits(self.backend.comparer.asset1_annualized_returns, 
-                                                           self.backend.comparer.asset2_annualized_returns)
-            axes.set_ylim(min_limit, max_limit)
-        style_chart(figure)
-        self.annualized_returns_plot_canvas_asset1.get_tk_widget().grid(row = 6, column = 3, columnspan = 2)
-
-    def _plot_volatility_asset1(self):
-        figure = Figure(figsize=(5, 3), dpi=self.chart_dpi)
-        self.volatility_canvas_asset1 = FigureCanvasTkAgg(figure, self.window)
-        axes = figure.add_subplot()
-        try:
-            periods = self.backend.comparer.asset1_volatility.keys()
-            values = self.backend.comparer.asset1_volatility.values()
-        except AttributeError:
-            pass
-        else:
-            bar = axes.bar(periods, values)
-            axes.set_title('Asset 1 Volatility')
-            axes.set_ylabel('%')
-            axes.bar_label(bar)
-            min_limit, max_limit = self._get_y_axes_limits(
-                self.backend.comparer.asset1_volatility,
-                self.backend.comparer.asset2_volatility)
-            axes.set_ylim(min_limit, max_limit)
-        style_chart(figure)
-        self.volatility_canvas_asset1.get_tk_widget().grid(row=7, column=1, columnspan=2)
-
-    def _plot_volatility_asset2(self):
-        figure = Figure(figsize=(5, 3), dpi=self.chart_dpi)
-        self.volatility_canvas_asset2 = FigureCanvasTkAgg(figure, self.window)
-        axes = figure.add_subplot()
-        try:
-            periods = self.backend.comparer.asset2_volatility.keys()
-            values = self.backend.comparer.asset2_volatility.values()
-        except AttributeError:
-            pass
-        else:
-            bar = axes.bar(periods, values)
-            axes.set_title('Asset 2 Volatility')
-            axes.set_ylabel('%')
-            axes.bar_label(bar)
-            min_limit, max_limit = self._get_y_axes_limits(
-                self.backend.comparer.asset1_volatility,
-                self.backend.comparer.asset2_volatility)
-            axes.set_ylim(min_limit, max_limit)
-        style_chart(figure)
-        self.volatility_canvas_asset2.get_tk_widget().grid(row=7, column=3, columnspan=2)
-
-    def _get_y_axes_limits(self, asset1_data: dict, asset2_data: dict):
-        asset1_values = list(asset1_data.values())
-        asset2_values = list(asset2_data.values())
-        min_limit = min(asset1_values+ asset2_values) * 1.1
-        max_limit = max(asset1_values+ asset2_values) * 1.1
-        if min_limit > 0:
-            min_limit = 0
-        if max_limit < 0:
-            max_limit = 0
-        return min_limit, max_limit

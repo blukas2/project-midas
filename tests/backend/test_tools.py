@@ -51,19 +51,25 @@ class TestFileManager:
     def test_read_portfolio_data_converts_localized_quantity_and_joins_asset_names(self, monkeypatch):
         monkeypatch.setattr(tools, "PORTFOLIOS_FOLDER", "portfolio-root")
         monkeypatch.setattr(tools, "ROOT_FOLDER", "app-root")
-        monkeypatch.setattr(
-            tools.pd, "read_csv",
-            lambda path, **kwargs: pd.DataFrame(
-                {"ISIN": ["DE0001"], "Titel": ["Fund"], "Menge": ["1.234,00"]}
-            ) if "portfolio-root" in path else pd.DataFrame(
+        reads = []
+
+        def read_csv(path, **kwargs):
+            reads.append((path, kwargs))
+            if "portfolio-root" in path:
+                return pd.DataFrame(
+                    {"ISIN": ["DE0001"], "Titel": ["Fund"], "Menge": ["1.234,00"]}
+                )
+            return pd.DataFrame(
                 {"isin": ["DE0001"], "ticker": ["ABC"]}
-            ),
-        )
+            )
+
+        monkeypatch.setattr(tools.pd, "read_csv", read_csv)
 
         result = FileManager()._read_portfolio_data("fund", "file.csv")
 
         assert result.loc[0, "quantity"] == 1234
         assert result.loc[0, "ticker"] == "ABC"
+        assert reads[1][1]["encoding"] == "cp1252"
 
     def test_date_parser_and_search_quote_defaults(self):
         manager = FileManager()

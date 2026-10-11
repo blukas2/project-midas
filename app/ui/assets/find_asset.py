@@ -3,11 +3,10 @@ from __future__ import annotations
 import tkinter as tk
 import customtkinter as ctk
 
-import numpy as np
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from ui.charts.figure_factory import FigureFactory
+from ui.charts.page_builder import ChartCardSpec
+from ui.charts.plotly_dashboard import PlotlyDashboard
 from ui.dialogs import ThemedMessageBox as msgbox
-from ui.theme import style_chart
 
 from typing import Callable, TYPE_CHECKING
 if TYPE_CHECKING:
@@ -22,7 +21,7 @@ class FindAssetWindow:
         self.window = ctk.CTkToplevel(master)
         self.window.title("Find Asset")
         self.window.geometry("1000x900")
-        self.chart_dpi = 80
+        self.chart_factory = FigureFactory()
         self.show_in_eur = False
         self.search_results = []
         self._selected_result_index: int | None = None
@@ -30,7 +29,7 @@ class FindAssetWindow:
         self._define_search_section()
         self._define_results_section()
         self._define_currency_dropdown()
-        self._define_chart_placeholders()
+        self._define_chart_dashboard()
         self._place_components()
 
     def _define_search_section(self):
@@ -54,11 +53,12 @@ class FindAssetWindow:
         )
         self.lbl_last_price = ctk.CTkLabel(self.window, text="", anchor="w")
 
-    def _define_chart_placeholders(self):
-        self.price_figure = Figure(figsize=(8, 4), dpi=self.chart_dpi)
-        self.price_canvas = FigureCanvasTkAgg(self.price_figure, self.window)
-        self.returns_figure = Figure(figsize=(6, 3), dpi=self.chart_dpi)
-        self.returns_canvas = FigureCanvasTkAgg(self.returns_figure, self.window)
+    def _define_chart_dashboard(self):
+        cards = [
+            ChartCardSpec("asset-history", "Price history", wide=True),
+            ChartCardSpec("asset-returns", "Annualized returns"),
+        ]
+        self.chart_dashboard = PlotlyDashboard(self.window, "Asset details", cards, height=620)
 
     def _place_components(self):
         self.lbl_search.grid(row=1, column=1)
@@ -68,8 +68,10 @@ class FindAssetWindow:
         self.listbox_results.grid(row=2, column=2, columnspan=3, pady=5, sticky="ew")
         self.dropdown_currency.grid(row=3, column=1, columnspan=2, pady=5)
         self.lbl_last_price.grid(row=3, column=3, columnspan=2, pady=5, sticky='w')
-        self.price_canvas.get_tk_widget().grid(row=4, column=1, columnspan=4)
-        self.returns_canvas.get_tk_widget().grid(row=5, column=1, columnspan=4)
+        self.chart_dashboard.grid(row=4, column=1, columnspan=5, sticky="nsew", padx=8, pady=8)
+        self.window.rowconfigure(4, weight=1)
+        for column in range(1, 6):
+            self.window.columnconfigure(column, weight=1)
 
     def _on_search(self):
         query = self.entry_search.get().strip()
@@ -127,8 +129,7 @@ class FindAssetWindow:
 
     def _refresh_charts(self):
         self._update_last_price_label()
-        self._plot_price_history()
-        self._plot_annualized_returns()
+        self.chart_dashboard.render(self._build_chart_figures())
 
     def _update_last_price_label(self):
         analyzer = self.backend.asset_analyzer
@@ -139,29 +140,23 @@ class FindAssetWindow:
         currency = analyzer.get_currency_label(self.show_in_eur)
         self.lbl_last_price.configure(text=f"Last Close: {price:.2f} {currency}")
 
-    def _plot_price_history(self):
-        self.price_figure.clear()
-        ax = self.price_figure.add_subplot(111)
-        df = self.backend.asset_analyzer.get_price_history(self.show_in_eur)
-        currency = self.backend.asset_analyzer.get_currency_label(self.show_in_eur)
-        df.plot(x='Date', y='Price', kind='line', legend=True, ax=ax)
-        ax.set_title(f"Price History ({currency})")
-        ax.set_ylabel(currency)
-        style_chart(self.price_figure)
-        self.price_canvas.draw()
+    def _build_chart_figures(self):
+        analyzer = self.backend.asset_analyzer
+        currency = analyzer.get_currency_label(self.show_in_eur)
+        history = analyzer.get_price_history(self.show_in_eur)
+        series = [("Asset", history["Date"].tolist(), history["Price"].tolist())]
+        returns = analyzer.get_annualized_returns(self.show_in_eur)
+        return self._chart_figures(series, currency, returns)
 
-    def _plot_annualized_returns(self):
-        self.returns_figure.clear()
-        ax = self.returns_figure.add_subplot(111)
-        returns = self.backend.asset_analyzer.get_annualized_returns(self.show_in_eur)
-        if returns:
-            bar = ax.bar(returns.keys(), returns.values())
-            ax.bar_label(bar)
-        currency = self.backend.asset_analyzer.get_currency_label(self.show_in_eur)
-        ax.set_title(f"Annualized Returns ({currency})")
-        ax.set_ylabel('%')
-        style_chart(self.returns_figure)
-        self.returns_canvas.draw()
+    def _chart_figures(self, series, currency, returns):
+        mode = ctk.get_appearance_mode()
+        history = self.chart_factory.line_chart(series, mode, currency)
+        annualized = self.chart_factory.bar_chart(returns, mode)
+        return {"asset-history": history, "asset-returns": annualized}
+
+    def _native_history_series(self):
+        history = self.backend.asset_analyzer.get_price_history(self.show_in_eur)
+        return [("Asset", history["Date"].tolist(), history["Price"].tolist())]
 
 
 class FindAssetForPositionWindow(FindAssetWindow):
@@ -178,8 +173,8 @@ class FindAssetForPositionWindow(FindAssetWindow):
         super()._place_components()
         self.btn_select = ctk.CTkButton(self.window, text="Select Asset", command=self._select_asset)
         self.btn_cancel = ctk.CTkButton(self.window, text="Cancel", command=self._cancel)
-        self.btn_select.grid(row=6, column=2, pady=5)
-        self.btn_cancel.grid(row=6, column=3, pady=5)
+        self.btn_select.grid(row=3, column=6, pady=5)
+        self.btn_cancel.grid(row=3, column=7, pady=5)
 
     def _on_select(self, event=None, index: int | None = None):
         if index is not None:
@@ -189,70 +184,42 @@ class FindAssetForPositionWindow(FindAssetWindow):
         self.selected_ticker = self.search_results[self._selected_result_index].ticker
         super()._on_select(event, self._selected_result_index)
 
-    def _plot_price_history(self):
-        self.price_figure.clear()
-        ax = self.price_figure.add_subplot(111)
+    def _build_chart_figures(self):
         analyzer = self.backend.asset_analyzer
         currency = analyzer.get_currency_label(self.show_in_eur)
-        if self.show_in_eur:
-            self._plot_indexed_price_history(ax)
-        else:
-            df = analyzer.get_price_history(self.show_in_eur)
-            df.plot(x='Date', y='Price', kind='line', legend=True, ax=ax)
-        ax.set_title(f"Price History ({currency})")
-        style_chart(self.price_figure)
-        self.price_canvas.draw()
-
-    def _plot_indexed_price_history(self, ax):
-        """Plot asset and portfolio both indexed to 100."""
-        analyzer = self.backend.asset_analyzer
-        asset_df = analyzer.get_indexed_price_history(in_eur=True)
-        asset_df.plot(x='Date', y='Asset', kind='line', legend=True, ax=ax)
-        try:
-            portfolio_df = analyzer.get_portfolio_indexed_history(self.backend.portfolio)
-            if not portfolio_df.empty:
-                portfolio_df.plot(x='Date', y='Portfolio', kind='line', legend=True, ax=ax)
-        except AttributeError:
-            pass
-        ax.set_ylabel('Index (100 = start)')
-
-    def _plot_annualized_returns(self):
-        self.returns_figure.clear()
-        ax = self.returns_figure.add_subplot(111)
-        analyzer = self.backend.asset_analyzer
-        currency = analyzer.get_currency_label(self.show_in_eur)
+        history = self._position_history_series()
         asset_returns = analyzer.get_annualized_returns(self.show_in_eur)
-        if self.show_in_eur:
-            self._plot_grouped_annualized_returns(ax, asset_returns)
-        else:
-            if asset_returns:
-                bar = ax.bar(asset_returns.keys(), asset_returns.values())
-                ax.bar_label(bar)
-        ax.set_title(f"Annualized Returns ({currency})")
-        ax.set_ylabel('%')
-        style_chart(self.returns_figure)
-        self.returns_canvas.draw()
+        returns = self._position_returns_figure(asset_returns)
+        axis_title = "Index (100 = start)" if self.show_in_eur else currency
+        return {
+            "asset-history": self.chart_factory.line_chart(history, ctk.get_appearance_mode(), axis_title),
+            "asset-returns": returns,
+        }
 
-    def _plot_grouped_annualized_returns(self, ax, asset_returns: dict):
-        """Plot asset and portfolio annualized returns side by side."""
-        try:
-            portfolio_returns = self.backend.portfolio.annualized_returns
-        except AttributeError:
-            portfolio_returns = {}
-        periods = list(asset_returns.keys())
-        if not periods:
-            return
-        x = np.arange(len(periods))
-        width = 0.35
-        asset_vals = [asset_returns.get(p, 0) for p in periods]
-        portfolio_vals = [portfolio_returns.get(p, 0) for p in periods]
-        bar1 = ax.bar(x - width / 2, asset_vals, width, label='Asset')
-        bar2 = ax.bar(x + width / 2, portfolio_vals, width, label='Portfolio')
-        ax.bar_label(bar1)
-        ax.bar_label(bar2)
-        ax.set_xticks(x)
-        ax.set_xticklabels(periods)
-        ax.legend()
+    def _position_history_series(self):
+        analyzer = self.backend.asset_analyzer
+        if not self.show_in_eur:
+            return self._native_history_series()
+        asset_history = analyzer.get_indexed_price_history(in_eur=True)
+        series = [("Asset", asset_history["Date"].tolist(), asset_history["Asset"].tolist())]
+        if hasattr(self.backend.portfolio, "history"):
+            series.extend(self._portfolio_history_series(analyzer, self.backend.portfolio))
+        return series
+
+    def _portfolio_history_series(self, analyzer, portfolio):
+        history = analyzer.get_portfolio_indexed_history(portfolio)
+        if history.empty:
+            return []
+        return [("Portfolio", history["Date"].tolist(), history["Portfolio"].tolist())]
+
+    def _position_returns_figure(self, asset_returns):
+        mode = ctk.get_appearance_mode()
+        if not self.show_in_eur:
+            return self.chart_factory.bar_chart(asset_returns, mode)
+        portfolio_returns = getattr(self.backend.portfolio, "annualized_returns", {})
+        return self.chart_factory.grouped_bar_chart(
+            [("Asset", asset_returns), ("Portfolio", portfolio_returns)], mode
+        )
 
     def _select_asset(self):
         if self.selected_ticker:
@@ -275,15 +242,15 @@ class FindAssetForCompareWindow(FindAssetWindow):
         super()._place_components()
         self.btn_select = ctk.CTkButton(self.window, text="Select Asset", command=self._select_asset)
         self.btn_cancel = ctk.CTkButton(self.window, text="Cancel", command=self._cancel)
-        self.btn_select.grid(row=6, column=2, pady=5)
-        self.btn_cancel.grid(row=6, column=3, pady=5)
+        self.btn_select.grid(row=3, column=6, pady=5)
+        self.btn_cancel.grid(row=3, column=7, pady=5)
 
-    def _on_select(self, event):
-        selection = self.listbox_results.curselection()
-        if not selection:
+    def _on_select(self, event=None, index: int | None = None):
+        if index is None and self._selected_result_index is None:
             return
-        self.selected_ticker = self.search_results[selection[0]].ticker
-        super()._on_select(event)
+        selected_index = index if index is not None else self._selected_result_index
+        self.selected_ticker = self.search_results[selected_index].ticker
+        super()._on_select(event, selected_index)
 
     def _select_asset(self):
         if self.selected_ticker:

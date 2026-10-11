@@ -1,7 +1,8 @@
 yfinance==0.2.14
-matplotlib==3.7.1
 customtkinter>=5.2.2,<6
-pandastable==0.13.1
+plotly>=5.10,<7
+pywebview==5.2
+tkwebview2==3.5.0
 numpy>=1.24.0
 python-dateutil
 scikit-learn

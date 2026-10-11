@@ -1,146 +1,142 @@
 from types import SimpleNamespace
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pandas as pd
-from matplotlib.figure import Figure
 
+from ui.charts.figure_factory import FigureFactory
 from ui.main_window.main_window import DropdownMenu, MainWindowComponents
 
 
 class TestMainWindowComponents:
-    def test_button_and_asset_table_setup(self, monkeypatch):
+    def test_button_setup(self, monkeypatch):
         component = MainWindowComponents.__new__(MainWindowComponents)
         component.window = object()
+        toolbar = Mock()
+        monkeypatch.setattr(
+            "ui.main_window.main_window.ctk.CTkFrame", Mock(return_value=toolbar)
+        )
         button_factory = Mock()
-        tree = MagicMock()
         monkeypatch.setattr("ui.main_window.main_window.ctk.CTkButton", button_factory)
-        monkeypatch.setattr("ui.main_window.main_window.ttk.Treeview", Mock(return_value=tree))
 
         component._define_buttons()
-        component._define_asset_table()
 
+        assert component.toolbar_frame is toolbar
         assert button_factory.call_count == 3
-        assert tree.column.call_count == 6
-        assert tree.heading.call_count == 6
-        assert component.asset_table is tree
 
-    def test_display_portfolio_name(self, monkeypatch):
+    def test_display_portfolio_name_creates_and_updates_label(self, monkeypatch):
         component = MainWindowComponents.__new__(MainWindowComponents)
-        component.window = object()
+        component.toolbar_frame = object()
         component.backend = SimpleNamespace(portfolio=SimpleNamespace(name="Growth"))
         label = Mock()
         monkeypatch.setattr("ui.main_window.main_window.ctk.CTkLabel", Mock(return_value=label))
 
         component.display_portfolio_name()
+        component.backend.portfolio.name = "Income"
+        component.display_portfolio_name()
 
-        label.grid.assert_called_once_with(row=1, column=1, columnspan=2)
+        assert label.configure.call_args.kwargs["text"] == "Portfolio: Income"
+        assert label.pack.call_count == 2
 
-    def test_refresh_table_replaces_rows_from_portfolio(self):
+    def test_place_components_creates_portfolio_label_before_placing_it(self, monkeypatch):
         component = MainWindowComponents.__new__(MainWindowComponents)
-        component.asset_table = Mock()
-        component.asset_table.get_children.return_value = []
+        component.window = Mock()
+        component.toolbar_frame = Mock()
+        component.btn_change_position = Mock()
+        component.btn_recalculate_portfolio = Mock()
+        component.btn_analyze_portfolio = Mock()
+        component.dashboard = Mock()
+        component.backend = SimpleNamespace(portfolio=SimpleNamespace(name="Growth"))
+        label = Mock()
+        monkeypatch.setattr("ui.main_window.main_window.ctk.CTkLabel", Mock(return_value=label))
+
+        component._place_components()
+
+        assert component.lbl_portfolio_name is label
+        component.toolbar_frame.grid.assert_called_once_with(
+            row=1, column=0, columnspan=8, sticky="ew", padx=8, pady=6
+        )
+        component.btn_change_position.pack.assert_called_once_with(side="left", padx=4)
+        label.pack.assert_called_once_with(side="left", padx=(12, 8))
+        component.dashboard.grid.assert_called_once_with(
+            row=2, column=0, columnspan=8, sticky="nsew", padx=10, pady=(0, 10)
+        )
+
+    def test_build_figures_maps_portfolio_data_to_interactive_charts(self, monkeypatch):
+        component = MainWindowComponents.__new__(MainWindowComponents)
+        component.chart_factory = FigureFactory()
+        component.backend = SimpleNamespace(portfolio=SimpleNamespace(
+            history=pd.DataFrame({
+                "Date": pd.to_datetime(["2024-01-01", "2024-01-02"]),
+                "Value": [100, 110],
+            }),
+            returns={"1y": 10},
+            annualized_returns={"1y": 8},
+            volatility={"1y": 5},
+            correlation_matrix=pd.DataFrame({"ABC": [1.0]}, index=["ABC"]),
+            content={},
+        ))
+        monkeypatch.setattr("ui.main_window.main_window.ctk.get_appearance_mode", lambda: "Light")
+
+        figures = component._build_figures()
+
+        assert set(figures) == {
+            "portfolio-history", "allocation", "portfolio-returns",
+            "annualized-returns", "portfolio-volatility", "correlation",
+        }
+        assert list(figures["portfolio-history"].data[0].y) == [100, 110]
+        assert list(figures["portfolio-returns"].data[0].y) == [10.0]
+        assert figures["correlation"].data[0].z == ([1.0],)
+
+    def test_holdings_rows_use_latest_converted_price(self):
+        component = MainWindowComponents.__new__(MainWindowComponents)
         asset = SimpleNamespace(
             ticker="ABC",
             quantity=2,
-            fast_info={"previousClose": 12.5},
+            price_history=pd.DataFrame({"Price": [12.5]}),
             get_longname=lambda: "Alpha",
         )
         component.backend = SimpleNamespace(portfolio=SimpleNamespace(content={"ABC": asset}))
 
+        assert component._holdings_rows() == [("ABC", "Alpha", "2", "12.50 EUR", "25.00 EUR")]
+
+    def test_refresh_table_sends_dashboard_content(self):
+        component = MainWindowComponents.__new__(MainWindowComponents)
+        component.backend = SimpleNamespace(portfolio=SimpleNamespace(name="Fund"))
+        component.dashboard = Mock()
+        component._build_figures = Mock(return_value={"history": object()})
+        component._build_metrics = Mock(return_value=[("Current value", "100 EUR")])
+        component._holdings_rows = Mock(return_value=[("ABC",)])
+
         component.refresh_table()
 
-        component.asset_table.delete.assert_called_once_with()
-        component.asset_table.insert.assert_called_once()
-        assert component.asset_table.insert.call_args.kwargs["values"] == ("ABC", "Alpha", 2, 12.5, 25)
+        component.dashboard.render.assert_called_once_with(
+            component._build_figures.return_value,
+            component._build_metrics.return_value,
+            ("Ticker", "Name", "Quantity", "Unit price", "Value"),
+            [("ABC",)],
+            "Fund",
+        )
 
-    def test_refresh_theme_restyles_correlation_table(self, monkeypatch):
+    def test_refresh_theme_applies_current_mode(self, monkeypatch):
         component = MainWindowComponents.__new__(MainWindowComponents)
-        component.table = Mock()
-        apply_options = Mock()
-        monkeypatch.setattr("ui.main_window.main_window.config.apply_options", apply_options)
+        component.dashboard = Mock()
         monkeypatch.setattr("ui.main_window.main_window.ctk.get_appearance_mode", lambda: "Dark")
 
         component.refresh_theme()
 
-        apply_options.assert_called_once()
-        assert apply_options.call_args.args[1] is component.table
-        component.table.redraw.assert_called_once_with()
+        component.dashboard.set_theme.assert_called_once_with("Dark")
 
-    def test_recalculate_refreshes_portfolio_views(self):
+    def test_recalculate_refreshes_dashboard(self):
         component = MainWindowComponents.__new__(MainWindowComponents)
         component.backend = SimpleNamespace(portfolio=SimpleNamespace(calculate=Mock()))
         component.display_portfolio_name = Mock()
         component.refresh_table = Mock()
-        for name in (
-            "plot_history", "plot_returns", "plot_annualized_returns",
-            "plot_volatility", "plot_correlation_matrix",
-        ):
-            setattr(component, name, Mock())
 
         component.recalculate_portfolio()
 
         component.backend.portfolio.calculate.assert_called_once_with()
         component.display_portfolio_name.assert_called_once_with()
         component.refresh_table.assert_called_once_with()
-        component.plot_history.assert_called_once_with()
-
-    def test_plot_methods_handle_uncomputed_portfolio_metrics(self, monkeypatch):
-        component = MainWindowComponents.__new__(MainWindowComponents)
-        component.window = object()
-        component.chart_dpi = 80
-        component.backend = SimpleNamespace(portfolio=SimpleNamespace())
-        figure, axes, canvas = Mock(), Mock(), Mock()
-        figure.add_subplot.return_value = axes
-        canvas.get_tk_widget.return_value = Mock()
-        monkeypatch.setattr("ui.main_window.main_window.Figure", lambda **kwargs: figure)
-        monkeypatch.setattr("ui.main_window.main_window.pyplot.Figure", lambda **kwargs: figure)
-        monkeypatch.setattr("ui.main_window.main_window.FigureCanvasTkAgg", lambda *args: canvas)
-        monkeypatch.setattr("ui.main_window.main_window.ctk.CTkFrame", Mock())
-        monkeypatch.setattr("ui.main_window.main_window.style_chart", Mock())
-        monkeypatch.setattr("ui.main_window.main_window.Table", Mock())
-        monkeypatch.setattr("ui.main_window.main_window.config.apply_options", Mock())
-
-        component.plot_history()
-        component.plot_returns()
-        component.plot_annualized_returns()
-        component.plot_volatility()
-        component.plot_correlation_matrix()
-
-        assert canvas.get_tk_widget.return_value.grid.call_count == 4
-
-    def test_plot_methods_render_available_portfolio_data(self, monkeypatch):
-        component = MainWindowComponents.__new__(MainWindowComponents)
-        component.window = object()
-        component.chart_dpi = 80
-        portfolio = SimpleNamespace(
-            history=pd.DataFrame(
-                {"Date": pd.to_datetime(["2024-01-01", "2024-01-02"]), "Value": [10, 12]}
-            ),
-            returns={"1m": 2},
-            annualized_returns={"1y": 3},
-            volatility={"1y": 5},
-            correlation_matrix=pd.DataFrame({"A": [1]}, index=["A"]),
-        )
-        component.backend = SimpleNamespace(portfolio=portfolio)
-        canvas = Mock()
-        canvas.get_tk_widget.return_value = Mock()
-        monkeypatch.setattr("ui.main_window.main_window.Figure", lambda **kwargs: Figure(**kwargs))
-        monkeypatch.setattr(
-            "ui.main_window.main_window.pyplot.Figure", lambda **kwargs: Figure(**kwargs)
-        )
-        monkeypatch.setattr("ui.main_window.main_window.FigureCanvasTkAgg", lambda *args: canvas)
-        monkeypatch.setattr("ui.main_window.main_window.ctk.CTkFrame", Mock())
-        monkeypatch.setattr("ui.main_window.main_window.style_chart", Mock())
-        monkeypatch.setattr("ui.main_window.main_window.Table", Mock())
-        monkeypatch.setattr("ui.main_window.main_window.config.apply_options", Mock())
-
-        component.plot_history()
-        component.plot_returns()
-        component.plot_annualized_returns()
-        component.plot_volatility()
-        component.plot_correlation_matrix()
-
-        assert canvas.get_tk_widget.return_value.grid.call_count == 4
 
     def test_window_action_callbacks_open_expected_popups(self, monkeypatch):
         component = MainWindowComponents.__new__(MainWindowComponents)
@@ -159,19 +155,14 @@ class TestMainWindowComponents:
 
 class TestDropdownMenu:
     def test_constructor_builds_all_menu_groups(self, monkeypatch):
-        root = Mock()
-        menu = Mock()
-        frame = Mock()
-        monkeypatch.setattr("ui.main_window.main_window.tk.Menu", Mock(return_value=menu))
+        root, menu, frame = Mock(), Mock(), Mock()
+        monkeypatch.setattr("ui.main_window.main_window.Menu", Mock(return_value=menu))
         monkeypatch.setattr("ui.main_window.main_window.ctk.CTkFrame", Mock(return_value=frame))
         monkeypatch.setattr("ui.main_window.main_window.ctk.CTkButton", Mock())
-        backend, main_window = object(), object()
 
-        dropdown = DropdownMenu(root, backend, main_window)
+        dropdown = DropdownMenu(root, object(), object())
 
         assert dropdown.root is root
-        assert dropdown.backend is backend
-        assert dropdown.main_window is main_window
         assert menu.add_command.call_count == 6
         frame.grid.assert_called_once()
 

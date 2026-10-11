@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import pandas as pd
 
 from backend import portfolio
@@ -10,10 +12,12 @@ class TestReferenceAssets:
         frame = pd.DataFrame(
             {"ticker": ["ABC", "XYZ"], "long_name": ["Alpha", None], "reference_ticker": ["REF", None]}
         )
-        monkeypatch.setattr(reference_assets.pd, "read_csv", lambda *args, **kwargs: frame)
+        read_csv = Mock(return_value=frame)
+        monkeypatch.setattr(reference_assets.pd, "read_csv", read_csv)
         monkeypatch.setattr(reference_assets, "Asset", lambda ticker, quantity: (ticker, quantity))
         assets = ReferenceAssets()
 
+        assert read_csv.call_args.kwargs["encoding"] == "cp1252"
         assert assets.retrieve_long_name("ABC") == "Alpha"
         assert assets.retrieve_long_name("missing") == "missing"
         assert assets.retrieve_reference_ticker("XYZ") is None

@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 class ReferenceAssets:
     def __init__(self):
-        self.asset_names_df = pd.read_csv(f"{ROOT_FOLDER}/asset_names.csv", sep=";", encoding="ISO-8859-1")
+        self.asset_names_df = pd.read_csv(
+            f"{ROOT_FOLDER}/asset_names.csv", sep=";", encoding="cp1252"
+        )
         self.asset_names_df = self.asset_names_df.where(pd.notnull(self.asset_names_df), None)
         self.asset_names_records = self.asset_names_df.to_dict(orient="records")
         self.long_name_dict = {record["ticker"]: record["long_name"] for record in self.asset_names_records}

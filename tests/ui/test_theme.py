@@ -31,17 +31,12 @@ class TestTheme:
         configure_native_theme.assert_called_once_with()
         refresh_charts.assert_called_once_with()
 
-    def test_chart_styler_applies_dark_palette(self, monkeypatch):
-        axes = Mock()
-        axes.spines = {"bottom": Mock()}
-        axes.texts = []
-        axes.get_legend.return_value = None
-        figure = Mock(axes=[axes])
+    def test_chart_styler_refreshes_registered_dashboards(self, monkeypatch):
+        dashboard = Mock()
         monkeypatch.setattr(theme.ctk, "get_appearance_mode", lambda: "Dark")
+        styler = theme.ChartStyler()
 
-        theme.ChartStyler().register(figure)
+        styler.register(dashboard)
+        styler.refresh()
 
-        figure.set_facecolor.assert_called_once_with("#2b2b2b")
-        axes.set_facecolor.assert_called_once_with("#2b2b2b")
-        axes.tick_params.assert_called_once_with(colors="#f2f2f2")
-        figure.canvas.draw_idle.assert_called_once_with()
+        dashboard.set_theme.assert_called_once_with("Dark")

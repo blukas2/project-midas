@@ -2,24 +2,26 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pandas as pd
-from matplotlib.figure import Figure
 
+from ui.charts.figure_factory import FigureFactory
 from ui.compare.compare import CompareWindow
 
 
 class TestCompareWindow:
-    def test_constructor_configures_currency_and_asset_entries(self, monkeypatch):
+    def test_constructor_configures_controls_and_dashboard(self, monkeypatch):
         popup = Mock()
         monkeypatch.setattr("ui.compare.compare.ctk.CTkToplevel", Mock(return_value=popup))
-        for name in ("CTkLabel", "CTkEntry", "CTkButton"):
+        for name in ("CTkLabel", "CTkEntry", "CTkButton", "CTkComboBox"):
             monkeypatch.setattr("ui.compare.compare.ctk." + name, Mock())
         monkeypatch.setattr("ui.compare.compare.tk.StringVar", Mock())
-        monkeypatch.setattr("ui.compare.compare.ctk.CTkComboBox", Mock())
+        dashboard = Mock()
+        monkeypatch.setattr("ui.compare.compare.PlotlyDashboard", Mock(return_value=dashboard))
 
         window = CompareWindow(object(), Mock())
 
         assert window._show_in_eur is True
         assert window._comparison_done is False
+        assert window.dashboard is dashboard
         popup.title.assert_called_once_with("Compare assets")
 
     def test_compare_sets_state_and_displays_results(self):
@@ -59,7 +61,7 @@ class TestCompareWindow:
 
         window.backend.comparer.recalculate.assert_not_called()
 
-    def test_currency_change_recalculates_and_replots(self):
+    def test_currency_change_recalculates_and_renders(self):
         window = CompareWindow.__new__(CompareWindow)
         window._comparison_done = True
         window._currency_var = SimpleNamespace(get=lambda: "Local")
@@ -72,7 +74,7 @@ class TestCompareWindow:
         window.backend.comparer.recalculate.assert_called_once_with(False)
         window._display_charts.assert_called_once_with()
 
-    def test_run_comparison_requires_two_tickers(self, monkeypatch):
+    def test_run_comparison_requires_two_tickers(self):
         window = CompareWindow.__new__(CompareWindow)
         window._use_portfolio_for_asset1 = False
         window._use_portfolio_for_asset2 = False
@@ -85,7 +87,7 @@ class TestCompareWindow:
 
         comparer.compare.assert_called_once_with("AAA", "BBB")
 
-    def test_run_comparison_can_use_portfolio_for_either_position(self):
+    def test_run_comparison_can_use_portfolio_for_asset1(self):
         window = CompareWindow.__new__(CompareWindow)
         window._use_portfolio_for_asset1 = True
         window._use_portfolio_for_asset2 = False
@@ -132,78 +134,40 @@ class TestCompareWindow:
 
     def test_portfolio_name_populates_entry_and_disables_it(self):
         window = CompareWindow.__new__(CompareWindow)
-        window.backend = SimpleNamespace(
-            portfolio=SimpleNamespace(name="Fund", content={"ABC": object()})
-        )
+        window.backend = SimpleNamespace(portfolio=SimpleNamespace(name="Fund", content={"ABC": object()}))
         entry = Mock()
 
         window._set_entry_to_portfolio_name(entry)
 
-        entry.delete.assert_called_once()
         entry.insert.assert_called_once_with(0, "Fund")
         entry.configure.assert_called_once_with(state="disabled")
 
-    def test_y_axis_limits_include_zero_for_positive_data(self):
-        window = CompareWindow.__new__(CompareWindow)
-
-        assert window._get_y_axes_limits({"a": 2}, {"b": 4}) == (0, 4.4)
-
-    def test_y_axis_limits_include_zero_for_negative_data(self):
-        window = CompareWindow.__new__(CompareWindow)
-
-        assert window._get_y_axes_limits({"a": -4}, {"b": -2}) == (-4.4, 0)
-
-    def test_display_charts_refreshes_all_comparison_views(self):
-        window = CompareWindow.__new__(CompareWindow)
-        methods = (
-            "_display_asset_names", "_plot_history_comparison",
-            "_plot_annualized_returns_asset1", "_plot_annualized_returns_asset2",
-            "_plot_volatility_asset1", "_plot_volatility_asset2",
+    def test_comparison_renders_history_and_grouped_metrics(self, monkeypatch):
+        dates = pd.to_datetime(["2024-01-01", "2024-01-02"])
+        comparer = SimpleNamespace(
+            asset1_name="Alpha",
+            asset2_name="Beta",
+            compare_table=pd.DataFrame({
+                "Date": dates,
+                "asset1_price_index": [100, 110],
+                "asset2_price_index": [100, 105],
+            }),
+            asset1_annualized_returns={"1y": 5},
+            asset2_annualized_returns={"1y": 3},
+            asset1_volatility={"1y": 10},
+            asset2_volatility={"1y": 8},
         )
-        for method in methods:
-            setattr(window, method, Mock())
+        window = CompareWindow.__new__(CompareWindow)
+        window.backend = SimpleNamespace(comparer=comparer)
+        window.chart_factory = FigureFactory()
+        window.dashboard = Mock()
+        window._currency_var = SimpleNamespace(get=lambda: "EUR")
+        monkeypatch.setattr("ui.compare.compare.ctk.get_appearance_mode", lambda: "Light")
 
         window._display_charts()
 
-        for method in methods:
-            getattr(window, method).assert_called_once_with()
-
-    def test_comparison_plots_render_history_returns_and_volatility(self, monkeypatch):
-        window = CompareWindow.__new__(CompareWindow)
-        window.chart_dpi = 80
-        window.window = object()
-        dates = pd.to_datetime(["2024-01-01", "2024-01-02"])
-        window.backend = SimpleNamespace(
-            comparer=SimpleNamespace(
-                asset1_name="Alpha",
-                asset2_name="Beta",
-                compare_table=pd.DataFrame(
-                    {
-                        "Date": dates,
-                        "asset1_price_index": [100, 110],
-                        "asset2_price_index": [100, 105],
-                    }
-                ),
-                asset1_annualized_returns={"1y": 5},
-                asset2_annualized_returns={"1y": 3},
-                asset1_volatility={"1y": 10},
-                asset2_volatility={"1y": 8},
-            )
-        )
-        canvas = Mock()
-        canvas.get_tk_widget.return_value = Mock()
-        monkeypatch.setattr("ui.compare.compare.Figure", lambda **kwargs: Figure(**kwargs))
-        monkeypatch.setattr(
-            "ui.compare.compare.pyplot.Figure", lambda **kwargs: Figure(**kwargs)
-        )
-        monkeypatch.setattr("ui.compare.compare.FigureCanvasTkAgg", lambda *args: canvas)
-        monkeypatch.setattr("ui.compare.compare.ctk.CTkLabel", Mock())
-
-        window._display_asset_names()
-        window._plot_history_comparison()
-        window._plot_annualized_returns_asset1()
-        window._plot_annualized_returns_asset2()
-        window._plot_volatility_asset1()
-        window._plot_volatility_asset2()
-
-        assert canvas.get_tk_widget.return_value.grid.call_count == 5
+        figures = window.dashboard.render.call_args.args[0]
+        assert list(figures["comparison-history"].data[0].y) == [100, 110]
+        assert list(figures["comparison-returns"].data[0].y) == [5.0]
+        assert list(figures["comparison-volatility"].data[1].y) == [8.0]
+        assert window.dashboard.render.call_args.kwargs["subtitle"] == "Comparison in EUR"

@@ -84,7 +84,9 @@ class FileManager:
             .str.replace(".", "").str.replace(",", ".")
             .astype(float).astype(int)
         )
-        asset_names_df = pd.read_csv(f"{ROOT_FOLDER}/asset_names.csv", sep=";", encoding="ISO-8859-1")
+        asset_names_df = pd.read_csv(
+            f"{ROOT_FOLDER}/asset_names.csv", sep=";", encoding="cp1252"
+        )
         portfolio_df = portfolio_df.merge(asset_names_df, on="isin", how="left")
         logger.debug("Loaded portfolio data with %d assets.", len(portfolio_df))
         return portfolio_df
